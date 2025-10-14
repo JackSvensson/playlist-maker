@@ -1,0 +1,36 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  spotifyId     String      @unique
+  name          String?
+  image         String?
+  playlists     Playlist[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Playlist {
+  id                String      @id @default(cuid())
+  spotifyPlaylistId String?     @unique
+  name              String
+  description       String?
+  seedTracks        Json        // Array of track IDs used as seeds
+  generatedTracks   Json        // Array of generated track objects
+  audioFeatures     Json?       // Analysis data
+  aiReasoning       Json?       // AI's decision process
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([userId])
+}
