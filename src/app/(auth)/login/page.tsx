@@ -1,7 +1,14 @@
-import { Button } from "@/components/ui/button"
-import { signIn } from "next-auth/react"
+import { auth, signIn } from "@/auth"
+import { redirect } from "next/navigation"
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const session = await auth()
+  
+  // If already logged in, redirect to dashboard
+  if (session) {
+    redirect("/dashboard")
+  }
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="text-center">
@@ -11,12 +18,19 @@ export default function LoginPage() {
         <p className="text-gray-400 text-xl mb-8">
           Create intelligent playlists powered by AI
         </p>
-        <Button
-          onClick={() => signIn("spotify", { callbackUrl: "/dashboard" })}
-          className="bg-[#1DB954] hover:bg-[#1ed760] text-white px-8 py-6 text-lg"
+        <form
+          action={async () => {
+            "use server"
+            await signIn("spotify", { redirectTo: "/dashboard" })
+          }}
         >
-          Login with Spotify
-        </Button>
+          <button
+            type="submit"
+            className="bg-[#1DB954] hover:bg-[#1ed760] text-white px-8 py-4 text-lg rounded-full font-semibold transition"
+          >
+            Login with Spotify
+          </button>
+        </form>
       </div>
     </div>
   )

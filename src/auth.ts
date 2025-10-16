@@ -1,6 +1,5 @@
 import NextAuth from "next-auth"
 import SpotifyProvider from "next-auth/providers/spotify"
-import { handlers } from "@/auth"
 
 const scopes = [
   "user-read-email",
@@ -43,7 +42,7 @@ async function refreshAccessToken(token: any) {
   }
 }
 
-const handler = NextAuth({
+export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     SpotifyProvider({
       clientId: process.env.SPOTIFY_CLIENT_ID!,
@@ -51,27 +50,37 @@ const handler = NextAuth({
       authorization: LOGIN_URL,
     }),
   ],
+  pages: {
+    signIn: "/login",
+  },
   callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token
-        token.refreshToken = account.refresh_token
-        token.accessTokenExpires = account.expires_at! * 1000
+    async jwt({ token, account, user }) {
+      if (account && user) {
+        return {
+          ...token,
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          accessTokenExpires: account.expires_at! * 1000,
+          user,
+        }
       }
 
-      // Token still valid
       if (Date.now() < (token.accessTokenExpires as number)) {
         return token
       }
 
-      // Token expired, refresh it
       return await refreshAccessToken(token)
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken as string
+      session.user = token.user as any
       return session
     },
   },
+  session: {
+    strategy: "jwt",
+  },
+  trustHost: true,
+  useSecureCookies: false, // <-- LÄGG TILL DENNA!
+  secret: process.env.NEXTAUTH_SECRET,
 })
-
-export const { GET, POST } = handlers
