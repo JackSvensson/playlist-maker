@@ -7,7 +7,7 @@ const scopes = [
   "playlist-modify-private",
   "user-top-read",
   "user-read-recently-played",
-].join(",")
+].join(" ")  // VIKTIGT: MELLANSLAG, inte komma!
 
 const params = {
   scope: scopes,
@@ -28,6 +28,7 @@ async function refreshAccessToken(token: any) {
       Authorization: `Basic ${Buffer.from(
         `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
       ).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params,
   })
@@ -81,6 +82,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
   trustHost: true,
-  useSecureCookies: false, // <-- LÄGG TILL DENNA!
+  useSecureCookies: false,
   secret: process.env.NEXTAUTH_SECRET,
 })

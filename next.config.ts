@@ -1,18 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async headers() {
-    return [
+  images: {
+    remotePatterns: [
       {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-        ],
+        protocol: 'https',
+        hostname: 'i.scdn.co',
+        pathname: '/image/**',
       },
-    ];
+      {
+        protocol: 'https',
+        hostname: '*.scdn.co',
+      },
+    ],
   },
 };
 
