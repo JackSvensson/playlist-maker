@@ -22,6 +22,18 @@ export async function POST(request: Request) {
 
     const spotify = await getSpotifyClient(session.accessToken)
     
+    // Get seed track details first
+    const seedTracksDetails = await spotify.getTracks(seedTracks)
+    const seedTracksData = seedTracksDetails.body.tracks.map(track => ({
+      id: track.id,
+      name: track.name,
+      artists: track.artists.map(a => a.name).join(", "),
+      album: track.album.name,
+      image: track.album.images[0]?.url,
+      uri: track.uri,
+      duration_ms: track.duration_ms,
+    }))
+    
     // Get audio features for seed tracks
     const audioFeaturesResponse = await spotify.getAudioFeaturesForTracks(seedTracks)
     const seedAudioFeatures = audioFeaturesResponse.body.audio_features.filter(f => f !== null)
@@ -35,38 +47,79 @@ export async function POST(request: Request) {
       acousticness: seedAudioFeatures.reduce((sum, f) => sum + f.acousticness, 0) / seedAudioFeatures.length,
     }
 
-    // Get recommendations based on seed tracks and their audio features
-    const recommendations = await spotify.getRecommendations({
-      seed_tracks: seedTracks.slice(0, 5), // Spotify API allows max 5 seeds
-      limit: 20,
-      target_danceability: avgFeatures.danceability,
-      target_energy: avgFeatures.energy,
-      target_valence: avgFeatures.valence,
-      target_tempo: avgFeatures.tempo,
-      target_acousticness: avgFeatures.acousticness,
-    })
+    // Try to get recommendations, with fallback to related artists method
+    let recommendedTracks = []
+    let usedFallback = false
 
-    const recommendedTracks = recommendations.body.tracks.map(track => ({
-      id: track.id,
-      name: track.name,
-      artists: track.artists.map(a => a.name).join(", "),
-      album: track.album.name,
-      image: track.album.images[0]?.url,
-      uri: track.uri,
-      duration_ms: track.duration_ms,
-    }))
+    try {
+      console.log("🎵 Attempting to get Spotify Recommendations...")
+      const recommendations = await spotify.getRecommendations({
+        seed_tracks: seedTracks.slice(0, 5),
+        limit: 20,
+        target_danceability: avgFeatures.danceability,
+        target_energy: avgFeatures.energy,
+        target_valence: avgFeatures.valence,
+        target_tempo: avgFeatures.tempo,
+        target_acousticness: avgFeatures.acousticness,
+      })
 
-    // Get seed track details
-    const seedTracksDetails = await spotify.getTracks(seedTracks)
-    const seedTracksData = seedTracksDetails.body.tracks.map(track => ({
-      id: track.id,
-      name: track.name,
-      artists: track.artists.map(a => a.name).join(", "),
-      album: track.album.name,
-      image: track.album.images[0]?.url,
-      uri: track.uri,
-      duration_ms: track.duration_ms,
-    }))
+      recommendedTracks = recommendations.body.tracks.map(track => ({
+        id: track.id,
+        name: track.name,
+        artists: track.artists.map(a => a.name).join(", "),
+        album: track.album.name,
+        image: track.album.images[0]?.url,
+        uri: track.uri,
+        duration_ms: track.duration_ms,
+      }))
+      
+      console.log("✅ Got recommendations successfully!")
+      
+    } catch (error: any) {
+      console.log("⚠️ Recommendations API failed (403), using fallback method...")
+      usedFallback = true
+      
+      // FALLBACK: Get related artists and their top tracks
+      const uniqueTracks = new Map()
+      
+      // For each seed track, get the artist's top tracks
+      for (const track of seedTracksDetails.body.tracks) {
+        const artistId = track.artists[0].id
+        
+        try {
+          const artistTopTracks = await spotify.getArtistTopTracks(artistId, 'SE')
+          
+          for (const topTrack of artistTopTracks.body.tracks.slice(0, 5)) {
+            if (!uniqueTracks.has(topTrack.id) && !seedTracks.includes(topTrack.id)) {
+              uniqueTracks.set(topTrack.id, {
+                id: topTrack.id,
+                name: topTrack.name,
+                artists: topTrack.artists.map(a => a.name).join(", "),
+                album: topTrack.album.name,
+                image: topTrack.album.images[0]?.url,
+                uri: topTrack.uri,
+                duration_ms: topTrack.duration_ms,
+              })
+            }
+            
+            if (uniqueTracks.size >= 20) break
+          }
+        } catch (err) {
+          console.error("Failed to get artist top tracks:", err)
+        }
+        
+        if (uniqueTracks.size >= 20) break
+      }
+      
+      recommendedTracks = Array.from(uniqueTracks.values())
+      console.log(`✅ Got ${recommendedTracks.length} tracks using fallback method`)
+    }
+
+    // If we still don't have enough tracks, add some seed tracks
+    if (recommendedTracks.length < 10) {
+      console.log("⚠️ Not enough recommendations, padding with seed tracks...")
+      recommendedTracks = [...recommendedTracks, ...seedTracksData]
+    }
 
     // Find or create user
     let user = await prisma.user.findUnique({
@@ -86,7 +139,9 @@ export async function POST(request: Request) {
 
     // Simple playlist metadata (default)
     let playlistName = `AI Playlist - ${new Date().toLocaleDateString()}`
-    let playlistDescription = `Generated from ${seedTracks.length} seed tracks`
+    let playlistDescription = usedFallback 
+      ? `Generated from ${seedTracks.length} seed tracks using artist recommendations`
+      : `Generated from ${seedTracks.length} seed tracks`
     let aiAnalysis = null
     
     // Use AI to analyze and create better playlist metadata
@@ -122,7 +177,8 @@ export async function POST(request: Request) {
       mood: aiAnalysis.mood,
       recommendedGenres: aiAnalysis.recommendedGenres,
       reasoning: aiAnalysis.reasoning,
-    } : null
+      usedFallback, // Track if we used fallback method
+    } : { usedFallback }
 
     // Save playlist to database
     const playlist = await prisma.playlist.create({
@@ -142,6 +198,7 @@ export async function POST(request: Request) {
       tracks: recommendedTracks,
       seedTracks: seedTracksData,
       audioFeatures: avgFeatures,
+      usedFallback,
     })
   } catch (error) {
     console.error("Playlist generation error:", error)
