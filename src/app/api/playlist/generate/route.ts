@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { seedTracks } = await request.json()
+    const { seedTracks, filters } = await request.json()
 
     if (!seedTracks || !Array.isArray(seedTracks) || seedTracks.length < 3) {
       return NextResponse.json(
@@ -106,12 +106,15 @@ export async function POST(request: Request) {
       console.log("🎵 Attempting to get Spotify Recommendations...")
       const recommendations = await spotify.getRecommendations({
         seed_tracks: seedTracks.slice(0, 5),
-        limit: 20,
-        target_danceability: avgFeatures.danceability,
-        target_energy: avgFeatures.energy,
-        target_valence: avgFeatures.valence,
-        target_tempo: avgFeatures.tempo,
-        target_acousticness: avgFeatures.acousticness,
+        limit: filters?.limit || 20,
+        target_danceability: filters?.targetDanceability || avgFeatures.danceability,
+        target_energy: filters?.targetEnergy || avgFeatures.energy,
+        target_valence: filters?.targetValence || avgFeatures.valence,
+        target_tempo: filters?.targetTempo || avgFeatures.tempo,
+        target_acousticness: filters?.targetAcousticness || avgFeatures.acousticness,
+        // Lägg till year filters om de finns:
+        ...(filters?.minYear && { min_release_date: `${filters.minYear}-01-01` }),
+        ...(filters?.maxYear && { max_release_date: `${filters.maxYear}-12-31` }),
       })
 
       recommendedTracks = recommendations.body.tracks.map(track => ({

@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { Search, Plus, X, Music, Loader2 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import PlaylistFilters from "../PlaylistFilters"
 
 interface Track {
   id: string
@@ -15,6 +16,18 @@ interface Track {
   duration_ms: number
 }
 
+interface PlaylistFilters {
+  targetEnergy?: number
+  targetDanceability?: number
+  targetValence?: number
+  targetTempo?: number
+  targetAcousticness?: number
+  minYear?: number
+  maxYear?: number
+  genres?: string[]
+  limit?: number
+}
+
 export default function TrackSearch() {
   const router = useRouter()
   const [query, setQuery] = useState("")
@@ -23,6 +36,7 @@ export default function TrackSearch() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [filters, setFilters] = useState<PlaylistFilters>({})
 
   const searchTracks = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -48,12 +62,10 @@ export default function TrackSearch() {
     const value = e.target.value
     setQuery(value)
     
-    // Clear existing timeout
     if (searchTimeout) {
       clearTimeout(searchTimeout)
     }
 
-    // Debounce search
     const timeout = setTimeout(() => {
       searchTracks(value)
     }, 500)
@@ -76,6 +88,10 @@ export default function TrackSearch() {
     setSelectedTracks(selectedTracks.filter(t => t.id !== trackId))
   }
 
+  const handleFiltersChange = (newFilters: PlaylistFilters) => {
+    setFilters(newFilters)
+  }
+
   const generatePlaylist = async () => {
     if (selectedTracks.length < 3) {
       alert("Please select at least 3 tracks")
@@ -91,6 +107,7 @@ export default function TrackSearch() {
         },
         body: JSON.stringify({
           seedTracks: selectedTracks.map(t => t.id),
+          filters: filters, // Send filters to backend
         }),
       })
 
@@ -100,7 +117,6 @@ export default function TrackSearch() {
 
       const data = await response.json()
       
-      // Redirect to playlist view
       router.push(`/playlist/${data.playlistId}`)
     } catch (error) {
       console.error("Generate playlist error:", error)
@@ -118,6 +134,12 @@ export default function TrackSearch() {
 
   return (
     <div className="space-y-8">
+      {/* Filters Component */}
+      <PlaylistFilters 
+        onFiltersChange={handleFiltersChange}
+        onApply={generatePlaylist}
+      />
+
       {/* Selected Tracks */}
       {selectedTracks.length > 0 && (
         <div className="bg-gray-900 rounded-xl p-6">
