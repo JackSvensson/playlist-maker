@@ -35,17 +35,22 @@ export async function POST(request: Request) {
     const spotify = await getSpotifyClient(session.accessToken)
     
     // Get user's Spotify ID
-    const me = await spotify.getMe()
-    const spotifyUserId = me.body.id
+    const meResponse = await spotify.getMe()
+    const spotifyUserId = meResponse.body.id
 
     // Create playlist on Spotify
-    const createdPlaylist = await spotify.createPlaylist(spotifyUserId, {
+    const createdPlaylistResponse = await spotify.createPlaylist(spotifyUserId, {
       name: playlist.name,
       description: playlist.description || "Created with AI Playlist Generator",
       public: false, // Private by default
     })
 
-    console.log(`✅ Created Spotify playlist: ${createdPlaylist.body.id}`)
+    // Extract body safely
+    const playlistBody: any = createdPlaylistResponse.body
+    const spotifyPlaylistId = playlistBody.id
+    const spotifyUrl = playlistBody.external_urls?.spotify
+
+    console.log(`✅ Created Spotify playlist: ${spotifyPlaylistId}`)
 
     // Get track URIs from generated tracks
     const generatedTracks = playlist.generatedTracks as any[]
@@ -64,20 +69,20 @@ export async function POST(request: Request) {
     const batchSize = 100
     for (let i = 0; i < trackUris.length; i += batchSize) {
       const batch = trackUris.slice(i, i + batchSize)
-      await spotify.addTracksToPlaylist(createdPlaylist.body.id, batch)
+      await spotify.addTracksToPlaylist(spotifyPlaylistId, batch)
       console.log(`✅ Added ${batch.length} tracks to playlist`)
     }
 
     // Update playlist in database with Spotify ID
     await prisma.playlist.update({
       where: { id: playlistId },
-      data: { spotifyPlaylistId: createdPlaylist.body.id },
+      data: { spotifyPlaylistId: spotifyPlaylistId },
     })
 
     return NextResponse.json({
       success: true,
-      spotifyPlaylistId: createdPlaylist.body.id,
-      spotifyUrl: createdPlaylist.body.external_urls.spotify,
+      spotifyPlaylistId: spotifyPlaylistId,
+      spotifyUrl: spotifyUrl,
       trackCount: trackUris.length,
     })
   } catch (error: any) {

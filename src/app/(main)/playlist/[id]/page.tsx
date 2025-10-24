@@ -5,7 +5,6 @@ import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Music } from "lucide-react"
 import { parsePlaylistData, type Track } from "@/types/playlist"
-import AudioFeaturesVisualization from "@/components/AudioFeaturesVisualization"
 import SaveToSpotifyButton from "@/components/SaveToSpotifyButton"
 
 export default async function PlaylistPage({
@@ -106,17 +105,11 @@ export default async function PlaylistPage({
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Audio Features */}
+          {/* Left Column - AI Reasoning */}
           <div className="lg:col-span-1">
-            {audioFeatures?.avgFeatures && (
-              <AudioFeaturesVisualization 
-                features={audioFeatures.avgFeatures}
-              />
-            )}
-            
             {/* AI Reasoning */}
             {aiReasoning?.reasoning && (
-              <div className="bg-gray-900 rounded-xl p-6 mt-6">
+              <div className="bg-gray-900 rounded-xl p-6">
                 <h3 className="font-bold mb-3 text-[#1DB954]">Why These Tracks?</h3>
                 <p className="text-sm text-gray-300">{aiReasoning.reasoning}</p>
                 

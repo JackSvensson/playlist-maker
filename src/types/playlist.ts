@@ -35,8 +35,13 @@ export interface Track {
   
   export interface AIAnalysis {
     mood: string
+    vibe?: string
     recommendedGenres: string[]
     reasoning: string
+    listeningContext?: string
+    emotionalJourney?: string
+    usedFallback?: boolean
+    algorithm?: string
   }
   
   export interface PlaylistData {
