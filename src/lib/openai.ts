@@ -4,17 +4,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-interface AudioFeatures {
-  danceability: number
-  energy: number
-  valence: number
-  tempo: number
-  acousticness: number
-  instrumentalness?: number
-  speechiness?: number
-  liveness?: number
-}
-
 interface Track {
   id: string
   name: string
@@ -22,7 +11,173 @@ interface Track {
   album?: string
 }
 
-// FÖRBÄTTRAD AI-ANALYS
+interface AudioFeatures {
+  danceability: number
+  energy: number
+  valence: number
+  tempo: number
+  acousticness: number
+}
+
+// AI-POWERED DIVERSITY HELPER
+export async function getAISearchStrategies(
+  seedTracks: Track[],
+  audioFeatures: AudioFeatures
+) {
+  try {
+    const prompt = `You are a music discovery expert. Analyze these seed tracks and help me find DIVERSE, similar music.
+
+SEED TRACKS:
+${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
+
+AUDIO PROFILE:
+- Energy: ${(audioFeatures.energy * 100).toFixed(0)}%
+- Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}%
+- Mood: ${(audioFeatures.valence * 100).toFixed(0)}%
+- Tempo: ${audioFeatures.tempo.toFixed(0)} BPM
+- Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}%
+
+YOUR TASK:
+Generate a diverse discovery strategy to find similar but DIFFERENT artists. Think about:
+1. What genres/subgenres are these tracks in?
+2. What related genres might fans enjoy?
+3. What artists are similar but not obvious?
+4. What time periods/eras match this vibe?
+5. What moods/contexts fit these tracks?
+
+Respond in JSON with:
+{
+  "primaryGenres": ["genre1", "genre2"],
+  "relatedGenres": ["genre3", "genre4"],
+  "suggestedArtists": ["artist1", "artist2", "artist3"],
+  "searchQueries": ["query1", "query2", "query3", "query4", "query5"],
+  "timeContext": "era description (e.g., '70s soul', '2010s indie')",
+  "diversityStrategy": "brief explanation of how to find variety"
+}
+
+IMPORTANT:
+- suggestedArtists should be DIFFERENT from the seed artists
+- searchQueries should be creative (not just artist names)
+- Think about discovering NEW music, not just popular hits`
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a music curator expert who helps discover diverse music. You think deeply about genres, eras, and musical connections to help users find new artists they'll love."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.8,
+      max_tokens: 600,
+      response_format: { type: "json_object" }
+    })
+
+    const strategy = JSON.parse(response.choices[0].message.content || '{}')
+    
+    return {
+      primaryGenres: strategy.primaryGenres || [],
+      relatedGenres: strategy.relatedGenres || [],
+      suggestedArtists: strategy.suggestedArtists || [],
+      searchQueries: strategy.searchQueries || [],
+      timeContext: strategy.timeContext || "",
+      diversityStrategy: strategy.diversityStrategy || "",
+    }
+  } catch (error) {
+    console.error("AI search strategies error:", error)
+    
+    // Fallback to basic strategies
+    return {
+      primaryGenres: ["indie", "alternative"],
+      relatedGenres: ["indie rock", "indie pop"],
+      suggestedArtists: [],
+      searchQueries: [
+        "indie alternative",
+        "alternative rock",
+        "indie pop",
+      ],
+      timeContext: "modern era",
+      diversityStrategy: "Using genre-based search",
+    }
+  }
+}
+
+// AI-POWERED TRACK FILTERING
+export async function getAITrackFiltering(
+  seedTracks: Track[],
+  candidateTracks: Track[],
+  audioFeatures: AudioFeatures
+) {
+  try {
+    // Only send up to 30 candidates to AI to keep costs down
+    const tracksToAnalyze = candidateTracks.slice(0, 30)
+    
+    const prompt = `You are a music curator. I have seed tracks and candidate tracks. Help me select the MOST DIVERSE yet similar candidates.
+
+SEED TRACKS (what user likes):
+${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
+
+CANDIDATE TRACKS (to choose from):
+${tracksToAnalyze.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
+
+GOAL: Select 15 tracks that:
+1. Are similar in vibe to seed tracks
+2. Are from DIFFERENT artists (maximum diversity)
+3. Represent different sub-styles within the genre
+4. Would create an interesting listening journey
+
+Respond with JSON:
+{
+  "selectedIndices": [1, 5, 8, ...], 
+  "reasoning": "brief explanation of selection strategy"
+}
+
+Return 15 indices (1-based) of the best diverse tracks.`
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert music curator who excels at creating diverse, cohesive playlists. You prioritize variety while maintaining musical coherence."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 300,
+      response_format: { type: "json_object" }
+    })
+
+    const result = JSON.parse(response.choices[0].message.content || '{}')
+    
+    // Convert 1-based indices to 0-based and filter valid tracks
+    const selectedTracks = (result.selectedIndices || [])
+      .map((idx: number) => tracksToAnalyze[idx - 1])
+      .filter(Boolean)
+    
+    return {
+      selectedTracks,
+      reasoning: result.reasoning || "AI-selected for diversity",
+    }
+  } catch (error) {
+    console.error("AI track filtering error:", error)
+    
+    // Fallback: just return first 15
+    return {
+      selectedTracks: candidateTracks.slice(0, 15),
+      reasoning: "Default selection",
+    }
+  }
+}
+
+// Original function kept for playlist naming
 export async function analyzePlaylistWithAI(
   seedTracks: Track[],
   audioFeatures: AudioFeatures
@@ -34,27 +189,23 @@ SEED TRACKS:
 ${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
 
 AUDIO ANALYSIS:
-- Energy Level: ${(audioFeatures.energy * 100).toFixed(0)}% ${getEnergyDescription(audioFeatures.energy)}
-- Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}% ${getDanceabilityDescription(audioFeatures.danceability)}
-- Mood (Valence): ${(audioFeatures.valence * 100).toFixed(0)}% ${getValenceDescription(audioFeatures.valence)}
-- Tempo: ${audioFeatures.tempo.toFixed(0)} BPM ${getTempoDescription(audioFeatures.tempo)}
-- Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}% ${getAcousticnessDescription(audioFeatures.acousticness)}
+- Energy Level: ${(audioFeatures.energy * 100).toFixed(0)}%
+- Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}%
+- Mood (Valence): ${(audioFeatures.valence * 100).toFixed(0)}%
+- Tempo: ${audioFeatures.tempo.toFixed(0)} BPM
+- Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}%
 
 YOUR TASK:
-Create a cohesive playlist concept that captures the essence of these tracks. Consider:
-1. The emotional journey these songs create
-2. The musical characteristics they share
-3. The perfect listening context (workout, study, party, etc.)
-4. Time of day or season that fits this vibe
+Create a cohesive playlist concept that captures the essence of these tracks.
 
 Respond in JSON format with:
 {
   "playlistName": "Creative name (max 60 chars, no generic words like 'Mix' or 'Playlist')",
-  "description": "Compelling description (max 150 chars) that makes someone want to listen",
-  "mood": "One-word mood descriptor (e.g., 'Euphoric', 'Melancholic', 'Energetic')",
-  "vibe": "2-3 word vibe (e.g., 'Late Night Drive', 'Summer Sunset', 'Gym Motivation')",
+  "description": "Compelling description (max 150 chars)",
+  "mood": "One-word mood descriptor",
+  "vibe": "2-3 word vibe",
   "recommendedGenres": ["genre1", "genre2", "genre3"],
-  "listeningContext": "When/where to listen (e.g., 'Perfect for evening workouts')",
+  "listeningContext": "When/where to listen",
   "emotionalJourney": "Brief description of the emotional arc",
   "reasoning": "Why these recommendations work together (2-3 sentences)"
 }`
@@ -64,14 +215,14 @@ Respond in JSON format with:
       messages: [
         {
           role: "system",
-          content: "You are a world-class music curator who understands the psychology of music, audio engineering, and creates compelling playlist narratives. You never use generic playlist names and always think deeply about the listening experience."
+          content: "You are a world-class music curator who understands the psychology of music and creates compelling playlist narratives."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.9, // Higher for more creative names
+      temperature: 0.9,
       max_tokens: 800,
       response_format: { type: "json_object" }
     })
@@ -90,63 +241,20 @@ Respond in JSON format with:
     }
   } catch (error) {
     console.error("OpenAI analysis error:", error)
-    
-    // Enhanced fallback with audio features
     return createIntelligentFallback(seedTracks, audioFeatures)
   }
 }
 
-// Helper functions for audio feature descriptions
-function getEnergyDescription(energy: number): string {
-  if (energy > 0.8) return "(Very High - Intense & Powerful)"
-  if (energy > 0.6) return "(High - Energetic & Lively)"
-  if (energy > 0.4) return "(Medium - Balanced)"
-  if (energy > 0.2) return "(Low - Calm & Relaxed)"
-  return "(Very Low - Ambient & Peaceful)"
-}
-
-function getDanceabilityDescription(danceability: number): string {
-  if (danceability > 0.8) return "(Very High - Club Ready)"
-  if (danceability > 0.6) return "(High - Groovy)"
-  if (danceability > 0.4) return "(Medium - Moderate Groove)"
-  if (danceability > 0.2) return "(Low - Not Dance-Focused)"
-  return "(Very Low - Ambient/Experimental)"
-}
-
-function getValenceDescription(valence: number): string {
-  if (valence > 0.8) return "(Very Positive - Euphoric & Upbeat)"
-  if (valence > 0.6) return "(Positive - Happy & Cheerful)"
-  if (valence > 0.4) return "(Neutral - Balanced)"
-  if (valence > 0.2) return "(Negative - Melancholic)"
-  return "(Very Negative - Dark & Somber)"
-}
-
-function getTempoDescription(tempo: number): string {
-  if (tempo > 140) return "(Very Fast - High Energy)"
-  if (tempo > 120) return "(Fast - Upbeat)"
-  if (tempo > 100) return "(Medium - Moderate)"
-  if (tempo > 80) return "(Slow - Relaxed)"
-  return "(Very Slow - Downtempo)"
-}
-
-function getAcousticnessDescription(acousticness: number): string {
-  if (acousticness > 0.7) return "(Highly Acoustic - Organic)"
-  if (acousticness > 0.4) return "(Somewhat Acoustic - Balanced)"
-  return "(Electronic - Produced)"
-}
-
-// Intelligent fallback when AI fails
+// Helper functions
 function createIntelligentFallback(tracks: Track[], features: AudioFeatures) {
   const energy = features.energy
   const valence = features.valence
-  const danceability = features.danceability
   
   let mood = "Balanced"
   let vibe = "Chill Vibes"
   let context = "Anytime listening"
   let name = "Curated Mix"
   
-  // Determine mood based on valence and energy
   if (valence > 0.6 && energy > 0.6) {
     mood = "Euphoric"
     vibe = "High Energy"
@@ -167,12 +275,6 @@ function createIntelligentFallback(tracks: Track[], features: AudioFeatures) {
     vibe = "Introspective"
     context = "Late night contemplation"
     name = "Midnight Thoughts"
-  }
-  
-  // Add danceability context
-  if (danceability > 0.7) {
-    vibe = "Dance Floor Ready"
-    context = "Get moving to these beats"
   }
   
   return {

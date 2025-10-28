@@ -101,6 +101,7 @@ export async function POST(request: Request) {
 
     let recommendedTracks: TrackData[] = []
     let usedFallback = false
+    let aiSearchStrategy = null
 
     try {
       console.log("🎵 Attempting to get Spotify Recommendations...")
@@ -112,7 +113,6 @@ export async function POST(request: Request) {
         target_valence: filters?.targetValence || avgFeatures.valence,
         target_tempo: filters?.targetTempo || avgFeatures.tempo,
         target_acousticness: filters?.targetAcousticness || avgFeatures.acousticness,
-        // Lägg till year filters om de finns:
         ...(filters?.minYear && { min_release_date: `${filters.minYear}-01-01` }),
         ...(filters?.maxYear && { max_release_date: `${filters.maxYear}-12-31` }),
       })
@@ -130,149 +130,177 @@ export async function POST(request: Request) {
       console.log("✅ Got recommendations successfully!")
       
     } catch (error: any) {
-      console.log("⚠️ Recommendations API failed, using DEVELOPMENT MODE optimized algorithm...")
+      console.log("⚠️ Recommendations API failed, using AI-ENHANCED DIVERSITY algorithm...")
       usedFallback = true
       
-      // DEVELOPMENT MODE OPTIMIZED ALGORITHM
-      // Uses only APIs that work in dev mode: Albums, Tracks, Search
+      // 🤖 AI-ENHANCED ALGORITHM
       try {
+        // STEP 1: Ask AI for search strategies
+        console.log("🤖 Asking AI for diversity strategies...")
+        const { getAISearchStrategies } = await import("@/lib/openai")
+        aiSearchStrategy = await getAISearchStrategies(seedTracksData, avgFeatures)
+        
+        console.log("✨ AI suggests:", {
+          genres: aiSearchStrategy.primaryGenres,
+          artists: aiSearchStrategy.suggestedArtists,
+          strategy: aiSearchStrategy.diversityStrategy
+        })
+        
         const uniqueTracks = new Map<string, TrackData>()
+        const artistTrackCount = new Map<string, number>()
+        const usedTrackNames = new Set<string>()
+        const MAX_TRACKS_PER_ARTIST = 2
+        
         const seedTracksDetails = await spotify.getTracks(seedTracks)
         const seedArtistIds = seedTracksDetails.body.tracks.map(t => t.artists[0].id)
         const seedArtistNames = seedTracksDetails.body.tracks.map(t => t.artists[0].name)
         
-        console.log("🔍 Strategy 1: Getting diverse albums from seed artists...")
-        // Get multiple albums per artist for variety
-        for (const artistId of seedArtistIds) {
-          try {
-            const albums = await spotify.getArtistAlbums(artistId, { 
-              limit: 5, // More albums = more variety
-              include_groups: 'album,single,compilation'
-            })
-            
-            // Shuffle albums to get random variety
-            const shuffledAlbums = albums.body.items.sort(() => Math.random() - 0.5)
-            
-            for (const album of shuffledAlbums.slice(0, 3)) {
-              try {
-                const albumTracks = await spotify.getAlbumTracks(album.id, { limit: 15 })
-                
-                // Take random tracks from different parts of the album
-                const trackCount = albumTracks.body.items.length
-                const positions = [
-                  Math.floor(trackCount * 0.2), // 20% into album
-                  Math.floor(trackCount * 0.5), // Middle
-                  Math.floor(trackCount * 0.8), // 80% into album
-                ]
-                
-                for (const pos of positions) {
-                  const track = albumTracks.body.items[pos]
-                  if (track && !uniqueTracks.has(track.id) && !seedTracks.includes(track.id)) {
-                    try {
-                      const fullTrack = await spotify.getTrack(track.id)
-                      uniqueTracks.set(fullTrack.body.id, {
-                        id: fullTrack.body.id,
-                        name: fullTrack.body.name,
-                        artists: fullTrack.body.artists.map(a => a.name).join(", "),
-                        album: fullTrack.body.album.name,
-                        image: fullTrack.body.album.images[0]?.url,
-                        uri: fullTrack.body.uri,
-                        duration_ms: fullTrack.body.duration_ms,
-                      })
-                    } catch (trackErr) {
-                      // Skip if track fetch fails
-                    }
-                  }
-                  
-                  if (uniqueTracks.size >= 12) break
-                }
-              } catch (albumErr) {
-                // Continue if album fetch fails
-              }
-              
-              if (uniqueTracks.size >= 12) break
-            }
-          } catch (err) {
-            console.error("Failed to get artist albums:", err)
-          }
-          
-          if (uniqueTracks.size >= 12) break
+        // Helper functions
+        const isSimilarTrackName = (name: string): boolean => {
+          const normalized = name.toLowerCase()
+            .replace(/\s*\(.*?\)\s*/g, '')
+            .replace(/\s*-.*$/g, '')
+            .trim()
+          return usedTrackNames.has(normalized)
         }
         
-        console.log(`✅ Got ${uniqueTracks.size} tracks from seed artist albums`)
+        const addTrackWithDiversity = (track: any): boolean => {
+          if (!track || !track.id || uniqueTracks.has(track.id) || seedTracks.includes(track.id)) {
+            return false
+          }
+          
+          const artistName = track.artists[0].name
+          const trackName = track.name
+          
+          const currentCount = artistTrackCount.get(artistName) || 0
+          if (currentCount >= MAX_TRACKS_PER_ARTIST) {
+            return false
+          }
+          
+          if (isSimilarTrackName(trackName)) {
+            return false
+          }
+          
+          uniqueTracks.set(track.id, {
+            id: track.id,
+            name: track.name,
+            artists: track.artists.map((a: any) => a.name).join(", "),
+            album: track.album.name,
+            image: track.album?.images?.[0]?.url,
+            uri: track.uri,
+            duration_ms: track.duration_ms,
+          })
+          
+          artistTrackCount.set(artistName, currentCount + 1)
+          const normalized = trackName.toLowerCase()
+            .replace(/\s*\(.*?\)\s*/g, '')
+            .replace(/\s*-.*$/g, '')
+            .trim()
+          usedTrackNames.add(normalized)
+          
+          return true
+        }
         
-        console.log("🔍 Strategy 2: Search-based discovery for variety...")
-        // Use search with genre-like terms to find similar music
-        const searchQueries = [
-          ...seedArtistNames.slice(0, 2), // Artist names
-          `${seedArtistNames[0]} similar`, // "Similar to X"
-          `${seedTracksData[0]?.name.split(' ')[0]} music`, // Keywords from track names
-        ]
-        
-        for (const query of searchQueries) {
+        // STRATEGY 1: AI-Suggested Artists
+        console.log("🔍 Strategy 1: Searching for AI-suggested artists...")
+        for (const artistName of aiSearchStrategy.suggestedArtists.slice(0, 5)) {
           try {
-            const searchResults = await spotify.searchTracks(query, { limit: 15 })
+            const artistSearch = await spotify.searchArtists(artistName, { limit: 1 })
+            if (artistSearch.body.artists?.items[0]) {
+              const artist = artistSearch.body.artists.items[0]
+              const topTracks = await spotify.getArtistTopTracks(artist.id, 'SE')
+              
+              let added = 0
+              for (const track of topTracks.body.tracks.slice(0, 5)) {
+                if (addTrackWithDiversity(track)) {
+                  added++
+                  if (added >= 2) break
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to get tracks for ${artistName}:`, err)
+          }
+          
+          if (uniqueTracks.size >= 10) break
+        }
+        
+        console.log(`✅ Got ${uniqueTracks.size} tracks from AI-suggested artists`)
+        
+        // STRATEGY 2: AI-Generated Search Queries
+        console.log("🔍 Strategy 2: Using AI-generated search queries...")
+        for (const searchQuery of aiSearchStrategy.searchQueries) {
+          try {
+            const searchResults = await spotify.searchTracks(searchQuery, { 
+              limit: 20,
+              offset: Math.floor(Math.random() * 10)
+            })
             
             if (searchResults.body.tracks) {
-              // Take tracks from positions 3-12 to avoid only getting the most popular
-              const tracks = searchResults.body.tracks.items.slice(2, 12)
+              const tracks = searchResults.body.tracks.items.slice(5, 20)
               
               for (const track of tracks) {
-                if (!uniqueTracks.has(track.id) && !seedTracks.includes(track.id)) {
-                  // Avoid adding tracks from seed artists (we want variety)
-                  const isFromSeedArtist = track.artists.some(a => 
-                    seedArtistNames.includes(a.name)
-                  )
-                  
-                  if (!isFromSeedArtist) {
-                    uniqueTracks.set(track.id, {
-                      id: track.id,
-                      name: track.name,
-                      artists: track.artists.map(a => a.name).join(", "),
-                      album: track.album.name,
-                      image: track.album.images[0]?.url,
-                      uri: track.uri,
-                      duration_ms: track.duration_ms,
-                    })
-                  }
-                }
-                
-                if (uniqueTracks.size >= 25) break
+                addTrackWithDiversity(track)
+                if (uniqueTracks.size >= 20) break
               }
             }
           } catch (searchErr) {
-            console.error("Search failed:", searchErr)
+            console.error("AI search query failed:", searchErr)
           }
           
-          if (uniqueTracks.size >= 25) break
+          if (uniqueTracks.size >= 20) break
         }
         
-        console.log(`✅ Total unique tracks: ${uniqueTracks.size}`)
+        console.log(`✅ Total after AI searches: ${uniqueTracks.size} tracks`)
         
-        // If still need more, add some carefully selected tracks from seed artists
+        // STRATEGY 3: Related Artists (Spotify's suggestions)
         if (uniqueTracks.size < 15) {
-          console.log("⚠️ Adding backup tracks from seed artists...")
-          for (const artistId of seedArtistIds.slice(0, 2)) {
+          console.log("🔍 Strategy 3: Related artists for more variety...")
+          for (const artistId of seedArtistIds.slice(0, 3)) {
             try {
-              const topTracks = await spotify.getArtistTopTracks(artistId, 'SE')
-              // Take tracks from the middle of the top tracks list (positions 3-7)
-              for (const track of topTracks.body.tracks.slice(2, 7)) {
-                if (!uniqueTracks.has(track.id) && !seedTracks.includes(track.id)) {
-                  uniqueTracks.set(track.id, {
-                    id: track.id,
-                    name: track.name,
-                    artists: track.artists.map(a => a.name).join(", "),
-                    album: track.album.name,
-                    image: track.album.images[0]?.url,
-                    uri: track.uri,
-                    duration_ms: track.duration_ms,
-                  })
+              const relatedArtists = await spotify.getArtistRelatedArtists(artistId)
+              
+              for (const relatedArtist of relatedArtists.body.artists.slice(0, 8)) {
+                try {
+                  const topTracks = await spotify.getArtistTopTracks(relatedArtist.id, 'SE')
+                  
+                  let addedFromThisArtist = 0
+                  for (const track of topTracks.body.tracks.slice(0, 5)) {
+                    if (addTrackWithDiversity(track)) {
+                      addedFromThisArtist++
+                      if (addedFromThisArtist >= 1) break
+                    }
+                  }
+                } catch (err) {
+                  // Continue if failed
                 }
                 
                 if (uniqueTracks.size >= 20) break
               }
             } catch (err) {
-              console.error("Failed to get backup tracks:", err)
+              console.error("Failed to get related artists:", err)
+            }
+            
+            if (uniqueTracks.size >= 20) break
+          }
+        }
+        
+        // STRATEGY 4: Fallback with seed artists (if needed)
+        if (uniqueTracks.size < 15) {
+          console.log("⚠️ Adding carefully selected tracks from seed artists...")
+          for (const artistId of seedArtistIds) {
+            try {
+              const topTracks = await spotify.getArtistTopTracks(artistId, 'SE')
+              
+              let added = 0
+              for (const track of topTracks.body.tracks) {
+                if (addTrackWithDiversity(track)) {
+                  added++
+                  if (added >= 1) break
+                }
+              }
+            } catch (err) {
+              console.error("Failed to get artist top tracks:", err)
             }
             
             if (uniqueTracks.size >= 20) break
@@ -281,15 +309,17 @@ export async function POST(request: Request) {
         
         recommendedTracks = Array.from(uniqueTracks.values())
         
-        // Shuffle for maximum variety
+        // Final shuffle
         recommendedTracks = recommendedTracks
           .sort(() => Math.random() - 0.5)
-          .slice(0, 20)
+          .slice(0, filters?.limit || 20)
         
-        console.log(`✅ Final playlist: ${recommendedTracks.length} tracks with variety`)
+        console.log(`✅ Final AI-enhanced playlist: ${recommendedTracks.length} tracks`)
+        console.log(`📊 Unique artists: ${new Set(recommendedTracks.map(t => t.artists.split(',')[0].trim())).size}`)
+        console.log(`🤖 AI Strategy used: ${aiSearchStrategy.diversityStrategy}`)
         
       } catch (fallbackError) {
-        console.error("❌ Algorithm failed:", fallbackError)
+        console.error("❌ AI-enhanced algorithm failed:", fallbackError)
         return NextResponse.json(
           { 
             error: "Failed to generate recommendations. Please try again.",
@@ -323,7 +353,7 @@ export async function POST(request: Request) {
 
     let playlistName = `AI Playlist - ${new Date().toLocaleDateString()}`
     let playlistDescription = usedFallback 
-      ? `Generated using intelligent algorithm with ${seedTracks.length} seed tracks`
+      ? `AI-powered discovery with ${seedTracks.length} seed tracks`
       : `Generated from ${seedTracks.length} seed tracks`
     let aiAnalysis = null
     
@@ -346,10 +376,12 @@ export async function POST(request: Request) {
       recommendedGenres: aiAnalysis.recommendedGenres,
       reasoning: aiAnalysis.reasoning,
       usedFallback,
-      algorithm: usedFallback ? 'dev-mode-optimized' : 'spotify-recommendations'
+      algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
+      aiSearchStrategy: aiSearchStrategy || undefined
     } : { 
       usedFallback,
-      algorithm: usedFallback ? 'dev-mode-optimized' : 'spotify-recommendations'
+      algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
+      aiSearchStrategy: aiSearchStrategy || undefined
     }
 
     const playlist = await prisma.playlist.create({
@@ -370,7 +402,8 @@ export async function POST(request: Request) {
       seedTracks: seedTracksData,
       audioFeatures: avgFeatures,
       usedFallback,
-      algorithm: usedFallback ? 'dev-mode-optimized' : 'spotify-recommendations'
+      algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
+      aiStrategy: aiSearchStrategy
     })
   } catch (error) {
     console.error("Playlist generation error:", error)
