@@ -19,11 +19,36 @@ interface AudioFeatures {
   acousticness: number
 }
 
+interface AISearchStrategy {
+  primaryGenres: string[]
+  relatedGenres: string[]
+  suggestedArtists: string[]
+  searchQueries: string[]
+  timeContext: string
+  diversityStrategy: string
+}
+
+interface AITrackFilteringResult {
+  selectedTracks: Track[]
+  reasoning: string
+}
+
+interface AIAnalysis {
+  playlistName: string
+  description: string
+  mood: string
+  vibe: string
+  recommendedGenres: string[]
+  listeningContext: string
+  emotionalJourney: string
+  reasoning: string
+}
+
 // AI-POWERED DIVERSITY HELPER
 export async function getAISearchStrategies(
   seedTracks: Track[],
   audioFeatures: AudioFeatures
-) {
+): Promise<AISearchStrategy> {
   try {
     const prompt = `You are a music discovery expert. Analyze these seed tracks and help me find DIVERSE, similar music.
 
@@ -77,7 +102,12 @@ IMPORTANT:
       response_format: { type: "json_object" }
     })
 
-    const strategy = JSON.parse(response.choices[0].message.content || '{}')
+    const content = response.choices[0].message.content
+    if (!content) {
+      throw new Error("No response from OpenAI")
+    }
+
+    const strategy = JSON.parse(content) as Partial<AISearchStrategy>
     
     return {
       primaryGenres: strategy.primaryGenres || [],
@@ -111,7 +141,7 @@ export async function getAITrackFiltering(
   seedTracks: Track[],
   candidateTracks: Track[],
   audioFeatures: AudioFeatures
-) {
+): Promise<AITrackFilteringResult> {
   try {
     // Only send up to 30 candidates to AI to keep costs down
     const tracksToAnalyze = candidateTracks.slice(0, 30)
@@ -155,12 +185,17 @@ Return 15 indices (1-based) of the best diverse tracks.`
       response_format: { type: "json_object" }
     })
 
-    const result = JSON.parse(response.choices[0].message.content || '{}')
+    const content = response.choices[0].message.content
+    if (!content) {
+      throw new Error("No response from OpenAI")
+    }
+
+    const result = JSON.parse(content) as { selectedIndices?: number[], reasoning?: string }
     
     // Convert 1-based indices to 0-based and filter valid tracks
     const selectedTracks = (result.selectedIndices || [])
       .map((idx: number) => tracksToAnalyze[idx - 1])
-      .filter(Boolean)
+      .filter((track): track is Track => track !== undefined)
     
     return {
       selectedTracks,
@@ -181,7 +216,7 @@ Return 15 indices (1-based) of the best diverse tracks.`
 export async function analyzePlaylistWithAI(
   seedTracks: Track[],
   audioFeatures: AudioFeatures
-) {
+): Promise<AIAnalysis> {
   try {
     const prompt = `You are an expert music curator and data analyst. Analyze these seed tracks and their audio characteristics to create a perfect playlist theme.
 
@@ -227,7 +262,12 @@ Respond in JSON format with:
       response_format: { type: "json_object" }
     })
 
-    const analysis = JSON.parse(response.choices[0].message.content || '{}')
+    const content = response.choices[0].message.content
+    if (!content) {
+      throw new Error("No response from OpenAI")
+    }
+
+    const analysis = JSON.parse(content) as Partial<AIAnalysis>
     
     return {
       playlistName: analysis.playlistName || `Curated Mix - ${new Date().toLocaleDateString()}`,
@@ -246,7 +286,7 @@ Respond in JSON format with:
 }
 
 // Helper functions
-function createIntelligentFallback(tracks: Track[], features: AudioFeatures) {
+function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AIAnalysis {
   const energy = features.energy
   const valence = features.valence
   

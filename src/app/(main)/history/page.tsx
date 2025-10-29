@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import { ArrowLeft, Music, Calendar } from "lucide-react"
 
+interface PlaylistTrack {
+  id: string
+  name: string
+  artists: string
+}
+
 export default async function HistoryPage() {
   const session = await auth()
   
@@ -52,7 +58,7 @@ export default async function HistoryPage() {
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
             {playlists.map(playlist => {
-              const tracks = playlist.generatedTracks as any[]
+              const tracks = playlist.generatedTracks as unknown as PlaylistTrack[]
               const trackCount = tracks?.length || 0
               
               return (

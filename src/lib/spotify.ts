@@ -5,6 +5,16 @@ const spotifyApi = new SpotifyWebApi({
   clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
 })
 
+interface SpotifyError {
+  statusCode?: number
+  message?: string
+  body?: {
+    error?: {
+      message?: string
+    }
+  }
+}
+
 export async function getSpotifyClient(accessToken: string) {
   spotifyApi.setAccessToken(accessToken)
   
@@ -12,11 +22,12 @@ export async function getSpotifyClient(accessToken: string) {
   try {
     await spotifyApi.getMe()
     console.log("✅ Spotify token is valid!")
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const spotifyError = error as SpotifyError
     console.error("❌ Spotify token error:", {
-      status: error.statusCode,
-      message: error.message,
-      body: error.body
+      status: spotifyError.statusCode,
+      message: spotifyError.message,
+      body: spotifyError.body
     })
   }
   

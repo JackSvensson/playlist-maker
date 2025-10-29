@@ -3,6 +3,19 @@ import { NextResponse } from "next/server"
 import { getSpotifyClient } from "@/lib/spotify"
 import { prisma } from "@/lib/prisma"
 
+interface TrackWithUri {
+  uri: string
+}
+
+interface SpotifyError {
+  body?: {
+    error?: {
+      message?: string
+    }
+  }
+  message?: string
+}
+
 export async function POST(request: Request) {
   const session = await auth()
   
@@ -39,24 +52,25 @@ export async function POST(request: Request) {
     const spotifyUserId = meResponse.body.id
 
     // Create playlist on Spotify
-    const createdPlaylistResponse = await spotify.createPlaylist(spotifyUserId, {
-      name: playlist.name,
-      description: playlist.description || "Created with AI Playlist Generator",
-      public: false, // Private by default
-    })
+    const createdPlaylistResponse = await spotify.createPlaylist(
+      playlist.name,
+      {
+        description: playlist.description || "Created with AI Playlist Generator",
+        public: false, // Private by default
+      }
+    )
 
-    // Extract body safely
-    const playlistBody: any = createdPlaylistResponse.body
-    const spotifyPlaylistId = playlistBody.id
-    const spotifyUrl = playlistBody.external_urls?.spotify
+    // Extract body safely - spotify-web-api-node returns body in the response
+    const spotifyPlaylistId = createdPlaylistResponse.body.id
+    const spotifyUrl = createdPlaylistResponse.body.external_urls?.spotify
 
     console.log(`✅ Created Spotify playlist: ${spotifyPlaylistId}`)
 
-    // Get track URIs from generated tracks
-    const generatedTracks = playlist.generatedTracks as any[]
+    // Get track URIs from generated tracks with proper typing
+    const generatedTracks = playlist.generatedTracks as unknown as TrackWithUri[]
     const trackUris = generatedTracks
       .map(track => track.uri)
-      .filter(uri => uri) // Remove any undefined URIs
+      .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0)
 
     if (trackUris.length === 0) {
       return NextResponse.json(
@@ -85,12 +99,17 @@ export async function POST(request: Request) {
       spotifyUrl: spotifyUrl,
       trackCount: trackUris.length,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Save to Spotify error:", error)
+    
+    const spotifyError = error as SpotifyError
+    const errorMessage = spotifyError.message || "Unknown error"
+    const errorBody = spotifyError.body?.error?.message
+    
     return NextResponse.json(
       { 
         error: "Failed to save playlist to Spotify",
-        details: error?.body?.error?.message || error.message || "Unknown error"
+        details: errorBody || errorMessage
       },
       { status: 500 }
     )

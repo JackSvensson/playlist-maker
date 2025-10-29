@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 import { getSpotifyClient } from "@/lib/spotify"
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 
 // Define types for our track data
 interface TrackData {
@@ -28,6 +29,54 @@ interface AudioFeature {
   tempo: number
 }
 
+interface PlaylistFilters {
+  limit?: number
+  targetDanceability?: number
+  targetEnergy?: number
+  targetValence?: number
+  targetTempo?: number
+  targetAcousticness?: number
+  minYear?: number
+  maxYear?: number
+}
+
+interface RequestBody {
+  seedTracks: string[]
+  filters?: PlaylistFilters
+}
+
+interface SpotifyTrack {
+  id: string
+  name: string
+  artists: Array<{ name: string; id: string }>
+  album: {
+    name: string
+    images: Array<{ url: string }>
+  }
+  uri: string
+  duration_ms: number
+}
+
+interface AISearchStrategy {
+  primaryGenres: string[]
+  relatedGenres: string[]
+  suggestedArtists: string[]
+  searchQueries: string[]
+  timeContext: string
+  diversityStrategy: string
+}
+
+interface AIAnalysis {
+  playlistName: string
+  description: string
+  mood: string
+  vibe?: string
+  recommendedGenres: string[]
+  reasoning: string
+  listeningContext?: string
+  emotionalJourney?: string
+}
+
 export async function POST(request: Request) {
   const session = await auth()
   
@@ -36,7 +85,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { seedTracks, filters } = await request.json()
+    const body = await request.json() as RequestBody
+    const { seedTracks, filters } = body
 
     if (!seedTracks || !Array.isArray(seedTracks) || seedTracks.length < 3) {
       return NextResponse.json(
@@ -59,7 +109,7 @@ export async function POST(request: Request) {
 
     try {
       const seedTracksDetails = await spotify.getTracks(seedTracks)
-      seedTracksData = seedTracksDetails.body.tracks.map(track => ({
+      seedTracksData = seedTracksDetails.body.tracks.map((track): TrackData => ({
         id: track.id,
         name: track.name,
         artists: track.artists.map(a => a.name).join(", "),
@@ -72,7 +122,7 @@ export async function POST(request: Request) {
       const audioFeaturesResponse = await spotify.getAudioFeaturesForTracks(seedTracks)
       seedAudioFeatures = audioFeaturesResponse.body.audio_features
         .filter((f): f is NonNullable<typeof f> => f !== null)
-        .map(f => ({
+        .map((f): AudioFeature => ({
           danceability: f.danceability,
           energy: f.energy,
           key: f.key,
@@ -101,7 +151,7 @@ export async function POST(request: Request) {
 
     let recommendedTracks: TrackData[] = []
     let usedFallback = false
-    let aiSearchStrategy = null
+    let aiSearchStrategy: AISearchStrategy | null = null
 
     try {
       console.log("🎵 Attempting to get Spotify Recommendations...")
@@ -117,7 +167,7 @@ export async function POST(request: Request) {
         ...(filters?.maxYear && { max_release_date: `${filters.maxYear}-12-31` }),
       })
 
-      recommendedTracks = recommendations.body.tracks.map(track => ({
+      recommendedTracks = recommendations.body.tracks.map((track): TrackData => ({
         id: track.id,
         name: track.name,
         artists: track.artists.map(a => a.name).join(", "),
@@ -129,7 +179,7 @@ export async function POST(request: Request) {
       
       console.log("✅ Got recommendations successfully!")
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log("⚠️ Recommendations API failed, using AI-ENHANCED DIVERSITY algorithm...")
       usedFallback = true
       
@@ -153,7 +203,6 @@ export async function POST(request: Request) {
         
         const seedTracksDetails = await spotify.getTracks(seedTracks)
         const seedArtistIds = seedTracksDetails.body.tracks.map(t => t.artists[0].id)
-        const seedArtistNames = seedTracksDetails.body.tracks.map(t => t.artists[0].name)
         
         // Helper functions
         const isSimilarTrackName = (name: string): boolean => {
@@ -164,7 +213,7 @@ export async function POST(request: Request) {
           return usedTrackNames.has(normalized)
         }
         
-        const addTrackWithDiversity = (track: any): boolean => {
+        const addTrackWithDiversity = (track: SpotifyTrack): boolean => {
           if (!track || !track.id || uniqueTracks.has(track.id) || seedTracks.includes(track.id)) {
             return false
           }
@@ -184,7 +233,7 @@ export async function POST(request: Request) {
           uniqueTracks.set(track.id, {
             id: track.id,
             name: track.name,
-            artists: track.artists.map((a: any) => a.name).join(", "),
+            artists: track.artists.map((a) => a.name).join(", "),
             album: track.album.name,
             image: track.album?.images?.[0]?.url,
             uri: track.uri,
@@ -355,7 +404,7 @@ export async function POST(request: Request) {
     let playlistDescription = usedFallback 
       ? `AI-powered discovery with ${seedTracks.length} seed tracks`
       : `Generated from ${seedTracks.length} seed tracks`
-    let aiAnalysis = null
+    let aiAnalysis: AIAnalysis | null = null
     
     try {
       const { analyzePlaylistWithAI } = await import("@/lib/openai")
@@ -384,14 +433,15 @@ export async function POST(request: Request) {
       aiSearchStrategy: aiSearchStrategy || undefined
     }
 
+    // Create playlist with proper Prisma JSON types
     const playlist = await prisma.playlist.create({
       data: {
         name: playlistName,
         description: playlistDescription,
-        seedTracks: seedTracksData.length > 0 ? seedTracksData as any : [],
-        generatedTracks: recommendedTracks as any,
-        audioFeatures: audioFeaturesData as any,
-        aiReasoning: aiReasoningData as any,
+        seedTracks: seedTracksData as Prisma.JsonArray,
+        generatedTracks: recommendedTracks as Prisma.JsonArray,
+        audioFeatures: audioFeaturesData as Prisma.InputJsonValue,
+        aiReasoning: aiReasoningData as Prisma.InputJsonValue,
         userId: user.id,
       }
     })
