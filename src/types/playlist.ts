@@ -3,7 +3,7 @@ export interface Track {
     name: string
     artists: string
     album: string
-    image: string
+    image: string | null
     uri: string
     duration_ms: number
   }
@@ -58,14 +58,36 @@ export interface Track {
   
   // Helper function to safely parse Prisma JSON fields
   export function parsePlaylistData(playlist: any): PlaylistData {
+    // Safely parse seedTracks
+    const seedTracks = Array.isArray(playlist.seedTracks) 
+      ? (playlist.seedTracks as any[]).map(track => ({
+          id: track.id || '',
+          name: track.name || '',
+          artists: track.artists || '',
+          album: track.album || '',
+          image: track.image || null,
+          uri: track.uri || '',
+          duration_ms: track.duration_ms || 0,
+        }))
+      : []
+  
+    // Safely parse generatedTracks
+    const generatedTracks = Array.isArray(playlist.generatedTracks)
+      ? (playlist.generatedTracks as any[]).map(track => ({
+          id: track.id || '',
+          name: track.name || '',
+          artists: track.artists || '',
+          album: track.album || '',
+          image: track.image || null,
+          uri: track.uri || '',
+          duration_ms: track.duration_ms || 0,
+        }))
+      : []
+  
     return {
       ...playlist,
-      seedTracks: Array.isArray(playlist.seedTracks) 
-        ? (playlist.seedTracks as Track[])
-        : [],
-      generatedTracks: Array.isArray(playlist.generatedTracks)
-        ? (playlist.generatedTracks as Track[])
-        : [],
+      seedTracks,
+      generatedTracks,
       audioFeatures: playlist.audioFeatures 
         ? (playlist.audioFeatures as AudioFeaturesData)
         : null,

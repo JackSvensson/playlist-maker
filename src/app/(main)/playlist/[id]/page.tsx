@@ -45,7 +45,7 @@ export default async function PlaylistPage({
     return `${minutes}:${seconds.toString().padStart(2, "0")}`
   }
 
-  const totalDuration = generatedTracks.reduce((sum, track) => sum + track.duration_ms, 0)
+  const totalDuration = generatedTracks.reduce((sum, track) => sum + (track.duration_ms || 0), 0)
   const totalMinutes = Math.floor(totalDuration / 60000)
 
   return (
@@ -151,7 +151,7 @@ export default async function PlaylistPage({
                       <p className="text-sm text-gray-400 truncate">{track.artists}</p>
                     </div>
                     <span className="text-sm text-gray-400">
-                      {formatDuration(track.duration_ms)}
+                      {formatDuration(track.duration_ms || 0)}
                     </span>
                   </div>
                 ))}
@@ -181,7 +181,7 @@ export default async function PlaylistPage({
                       <p className="text-xs text-gray-500 truncate">{track.album}</p>
                     </div>
                     <span className="text-sm text-gray-400">
-                      {formatDuration(track.duration_ms)}
+                      {formatDuration(track.duration_ms || 0)}
                     </span>
                   </div>
                 ))}

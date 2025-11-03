@@ -14,7 +14,6 @@ export default function SaveToSpotifyButton({
 }: SaveToSpotifyButtonProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(!!spotifyPlaylistId)
-  const [spotifyUrl, setSpotifyUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
@@ -46,7 +45,6 @@ export default function SaveToSpotifyButton({
       const data = await response.json()
       
       setSaved(true)
-      setSpotifyUrl(data.spotifyUrl)
       
       // Success notification
       alert(`✅ Playlist saved to Spotify with ${data.trackCount} tracks!`)
@@ -55,10 +53,11 @@ export default function SaveToSpotifyButton({
       if (data.spotifyUrl) {
         window.open(data.spotifyUrl, '_blank')
       }
-    } catch (error: any) {
-      console.error('Save to Spotify error:', error)
-      setError(error.message || 'Failed to save playlist')
-      alert(`❌ Failed to save: ${error.message}`)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save playlist'
+      console.error('Save to Spotify error:', err)
+      setError(errorMessage)
+      alert(`❌ Failed to save: ${errorMessage}`)
     } finally {
       setSaving(false)
     }
