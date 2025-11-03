@@ -27,6 +27,7 @@ interface AudioFeature {
   liveness: number
   valence: number
   tempo: number
+  [key: string]: number  // Index signature for dynamic property access
 }
 
 interface PlaylistFilters {
