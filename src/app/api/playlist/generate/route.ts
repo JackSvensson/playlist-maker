@@ -2,7 +2,6 @@ import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 import { getSpotifyClient } from "@/lib/spotify"
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
 
 // Define types for our track data
 interface TrackData {
@@ -434,15 +433,16 @@ export async function POST(request: Request) {
       aiSearchStrategy: aiSearchStrategy || undefined
     }
 
-    // Create playlist with proper Prisma JSON types
+    // Create playlist with proper JSON serialization
+    // Using JSON.parse(JSON.stringify()) ensures all data is properly serializable
     const playlist = await prisma.playlist.create({
       data: {
         name: playlistName,
         description: playlistDescription,
-        seedTracks: seedTracksData as Prisma.JsonArray,
-        generatedTracks: recommendedTracks as Prisma.JsonArray,
-        audioFeatures: audioFeaturesData as Prisma.InputJsonValue,
-        aiReasoning: aiReasoningData as Prisma.InputJsonValue,
+        seedTracks: JSON.parse(JSON.stringify(seedTracksData)),
+        generatedTracks: JSON.parse(JSON.stringify(recommendedTracks)),
+        audioFeatures: JSON.parse(JSON.stringify(audioFeaturesData)),
+        aiReasoning: JSON.parse(JSON.stringify(aiReasoningData)),
         userId: user.id,
       }
     })
