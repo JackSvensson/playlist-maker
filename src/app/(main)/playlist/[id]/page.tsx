@@ -10,7 +10,7 @@ import SaveToSpotifyButton from "@/components/SaveToSpotifyButton"
 export default async function PlaylistPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   const session = await auth()
   
@@ -18,8 +18,11 @@ export default async function PlaylistPage({
     redirect("/login")
   }
 
+  // Await params in Next.js 15
+  const { id } = await params
+
   const playlist = await prisma.playlist.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { user: true }
   })
 
