@@ -26,6 +26,8 @@ interface AISearchStrategy {
   searchQueries: string[]
   timeContext: string
   diversityStrategy: string
+  excludedGenres: string[]
+  musicalCharacteristics: string[]
 }
 
 interface AIAnalysis {
@@ -44,55 +46,64 @@ export async function getAISearchStrategies(
   audioFeatures: AudioFeatures
 ): Promise<AISearchStrategy> {
   try {
-    const prompt = `You are a music discovery expert. Analyze these seed tracks and help me find DIVERSE, similar music.
+    const prompt = `You are an expert music curator. Analyze these seed tracks VERY CAREFULLY to understand their exact musical style, mood, and genre.
 
 SEED TRACKS:
 ${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
 
-AUDIO PROFILE:
-- Energy: ${(audioFeatures.energy * 100).toFixed(0)}%
-- Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}%
-- Mood: ${(audioFeatures.valence * 100).toFixed(0)}%
-- Tempo: ${audioFeatures.tempo.toFixed(0)} BPM
-- Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}%
+AUDIO CHARACTERISTICS:
+- Energy: ${(audioFeatures.energy * 100).toFixed(0)}% ${audioFeatures.energy > 0.7 ? '(High energy)' : audioFeatures.energy < 0.4 ? '(Low energy/calm)' : '(Moderate)'}
+- Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}% ${audioFeatures.danceability > 0.7 ? '(Very danceable)' : audioFeatures.danceability < 0.4 ? '(Not very danceable)' : '(Somewhat danceable)'}
+- Mood: ${(audioFeatures.valence * 100).toFixed(0)}% ${audioFeatures.valence > 0.6 ? '(Happy/uplifting)' : audioFeatures.valence < 0.4 ? '(Melancholic/sad)' : '(Balanced mood)'}
+- Tempo: ${audioFeatures.tempo.toFixed(0)} BPM ${audioFeatures.tempo > 140 ? '(Fast)' : audioFeatures.tempo < 100 ? '(Slow)' : '(Medium)'}
+- Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}% ${audioFeatures.acousticness > 0.6 ? '(Very acoustic)' : '(More electronic/produced)'}
 
-YOUR TASK:
-Generate a diverse discovery strategy to find similar but DIFFERENT artists. Think about:
-1. What genres/subgenres are these tracks in?
-2. What related genres might fans enjoy?
-3. What artists are similar but not obvious?
-4. What time periods/eras match this vibe?
-5. What moods/contexts fit these tracks?
+CRITICAL INSTRUCTIONS:
+1. **Identify the EXACT genre(s)** of these tracks - be specific (e.g., "indie pop", "soul", "contemporary R&B", NOT just "pop")
+2. **Pay close attention to the VIBE** - are these introspective? Uplifting? Melancholic? Party tracks? Chill?
+3. **Match the instrumentation** - acoustic vs electronic, organic vs synthesized
+4. **DO NOT mix genres** - if tracks are indie/pop/soul, DO NOT suggest hip-hop/rap/rock unless they truly match
+5. **Suggest artists with SIMILAR SOUND** - not just same era or popularity
 
 Respond in JSON with:
 {
-  "primaryGenres": ["genre1", "genre2"],
-  "relatedGenres": ["genre3", "genre4"],
-  "suggestedArtists": ["artist1", "artist2", "artist3"],
-  "searchQueries": ["query1", "query2", "query3", "query4", "query5"],
-  "timeContext": "era description (e.g., '70s soul', '2010s indie')",
-  "diversityStrategy": "brief explanation of how to find variety"
+  "primaryGenres": ["specific genre 1", "specific genre 2"],
+  "relatedGenres": ["closely related genre 1", "closely related genre 2"],
+  "suggestedArtists": ["artist who sounds VERY similar 1", "artist 2", "artist 3", "artist 4", "artist 5"],
+  "searchQueries": [
+    "genre + mood combination 1",
+    "genre + mood combination 2", 
+    "specific musical style descriptor",
+    "instrumentation + genre",
+    "mood + era"
+  ],
+  "timeContext": "specific era/period that matches these tracks",
+  "diversityStrategy": "how to find variety WITHIN the same genre/vibe",
+  "excludedGenres": ["genres to AVOID that don't match this vibe"],
+  "musicalCharacteristics": ["key musical elements like 'acoustic guitar', 'soulful vocals', 'electronic production', etc."]
 }
 
-IMPORTANT:
-- suggestedArtists should be DIFFERENT from the seed artists
-- searchQueries should be creative (not just artist names)
-- Think about discovering NEW music, not just popular hits`
+EXAMPLES OF GOOD VS BAD MATCHING:
+- Seed: Indie pop ballads → GOOD: acoustic indie, dream pop, indie folk | BAD: hip-hop, metal, EDM
+- Seed: Upbeat soul → GOOD: neo-soul, contemporary R&B, funk | BAD: sad indie, heavy rock
+- Seed: Chill electronic → GOOD: chillwave, downtempo, ambient | BAD: hardstyle, dubstep
+
+Be PRECISE and SPECIFIC. Quality over quantity.`
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are a music curator expert who helps discover diverse music. You think deeply about genres, eras, and musical connections to help users find new artists they'll love."
+          content: "You are a professional music curator with deep knowledge of genres, subgenres, and musical styles. You excel at identifying subtle differences between genres and matching tracks with precision. You NEVER mix incompatible genres."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.8,
-      max_tokens: 600,
+      temperature: 0.7,
+      max_tokens: 800,
       response_format: { type: "json_object" }
     })
 
@@ -110,21 +121,36 @@ IMPORTANT:
       searchQueries: strategy.searchQueries || [],
       timeContext: strategy.timeContext || "",
       diversityStrategy: strategy.diversityStrategy || "",
+      excludedGenres: strategy.excludedGenres || [],
+      musicalCharacteristics: strategy.musicalCharacteristics || [],
     }
   } catch (error) {
     console.error("AI search strategies error:", error)
     
+    const isChill = audioFeatures.energy < 0.5 && audioFeatures.valence < 0.6
+    const isUpbeat = audioFeatures.energy > 0.6 && audioFeatures.valence > 0.6
+    const isAcoustic = audioFeatures.acousticness > 0.5
+    
+    let fallbackGenres = ["indie", "alternative"]
+    let fallbackQueries = ["indie alternative", "indie pop"]
+    
+    if (isChill && isAcoustic) {
+      fallbackGenres = ["indie folk", "acoustic"]
+      fallbackQueries = ["acoustic indie", "indie folk", "singer songwriter"]
+    } else if (isUpbeat) {
+      fallbackGenres = ["indie pop", "alternative pop"]
+      fallbackQueries = ["indie pop", "upbeat indie", "alternative pop"]
+    }
+    
     return {
-      primaryGenres: ["indie", "alternative"],
+      primaryGenres: fallbackGenres,
       relatedGenres: ["indie rock", "indie pop"],
       suggestedArtists: [],
-      searchQueries: [
-        "indie alternative",
-        "alternative rock",
-        "indie pop",
-      ],
+      searchQueries: fallbackQueries,
       timeContext: "modern era",
-      diversityStrategy: "Using genre-based search",
+      diversityStrategy: "Using genre-based search with mood matching",
+      excludedGenres: [],
+      musicalCharacteristics: [],
     }
   }
 }
@@ -134,31 +160,30 @@ export async function analyzePlaylistWithAI(
   audioFeatures: AudioFeatures
 ): Promise<AIAnalysis> {
   try {
-    const prompt = `You are an expert music curator and data analyst. Analyze these seed tracks and their audio characteristics to create a perfect playlist theme.
+    const prompt = `You are an expert music curator. Analyze these tracks to create a cohesive playlist theme.
 
 SEED TRACKS:
 ${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
 
-AUDIO ANALYSIS:
-- Energy Level: ${(audioFeatures.energy * 100).toFixed(0)}%
+AUDIO CHARACTERISTICS:
+- Energy: ${(audioFeatures.energy * 100).toFixed(0)}% ${audioFeatures.energy > 0.7 ? '(energetic)' : audioFeatures.energy < 0.4 ? '(calm)' : '(moderate)'}
 - Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}%
-- Mood (Valence): ${(audioFeatures.valence * 100).toFixed(0)}%
+- Mood: ${(audioFeatures.valence * 100).toFixed(0)}% ${audioFeatures.valence > 0.6 ? '(positive)' : audioFeatures.valence < 0.4 ? '(melancholic)' : '(balanced)'}
 - Tempo: ${audioFeatures.tempo.toFixed(0)} BPM
 - Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}%
 
-YOUR TASK:
-Create a cohesive playlist concept that captures the essence of these tracks.
+Create a SPECIFIC and ACCURATE playlist concept that truly captures these tracks.
 
-Respond in JSON format with:
+Respond in JSON:
 {
-  "playlistName": "Creative name (max 60 chars, no generic words like 'Mix' or 'Playlist')",
-  "description": "Compelling description (max 150 chars)",
-  "mood": "One-word mood descriptor",
-  "vibe": "2-3 word vibe",
-  "recommendedGenres": ["genre1", "genre2", "genre3"],
-  "listeningContext": "When/where to listen",
-  "emotionalJourney": "Brief description of the emotional arc",
-  "reasoning": "Why these recommendations work together (2-3 sentences)"
+  "playlistName": "Creative, specific name (60 chars max, NO generic words like 'Mix' or 'Playlist')",
+  "description": "Compelling description matching the actual vibe (150 chars max)",
+  "mood": "Precise one-word mood",
+  "vibe": "2-3 words describing the exact feeling",
+  "recommendedGenres": ["specific genre 1", "specific genre 2", "specific genre 3"],
+  "listeningContext": "Perfect situation for this SPECIFIC vibe",
+  "emotionalJourney": "What emotional experience this playlist creates",
+  "reasoning": "Why these tracks work together and what makes them cohesive (2-3 sentences)"
 }`
 
     const response = await openai.chat.completions.create({
@@ -166,14 +191,14 @@ Respond in JSON format with:
       messages: [
         {
           role: "system",
-          content: "You are a world-class music curator who understands the psychology of music and creates compelling playlist narratives."
+          content: "You are a world-class music curator who understands subtle musical nuances and creates compelling, accurate playlist narratives. You are precise and specific in your genre identification."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.9,
+      temperature: 0.8,
       max_tokens: 800,
       response_format: { type: "json_object" }
     })
@@ -204,43 +229,70 @@ Respond in JSON format with:
 function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AIAnalysis {
   const energy = features.energy
   const valence = features.valence
+  const acousticness = features.acousticness
   
   let mood = "Balanced"
   let vibe = "Chill Vibes"
   let context = "Anytime listening"
   let name = "Curated Mix"
+  let genres: string[] = []
   
-  if (valence > 0.6 && energy > 0.6) {
+  // More nuanced fallback logic
+  if (acousticness > 0.6) {
+    if (valence > 0.6) {
+      mood = "Uplifting"
+      vibe = "Acoustic Sunshine"
+      context = "Perfect for peaceful mornings or sunny afternoons"
+      name = "Acoustic Daydreams"
+      genres = ["acoustic", "indie folk", "singer-songwriter"]
+    } else if (valence < 0.4) {
+      mood = "Contemplative"
+      vibe = "Introspective Acoustic"
+      context = "Late night reflection and quiet moments"
+      name = "Quiet Contemplation"
+      genres = ["acoustic", "indie folk", "melancholic"]
+    } else {
+      mood = "Mellow"
+      vibe = "Acoustic Balance"
+      context = "Background music for focus or relaxation"
+      name = "Acoustic Reflections"
+      genres = ["acoustic", "indie", "folk"]
+    }
+  } else if (energy > 0.7 && valence > 0.6) {
     mood = "Euphoric"
     vibe = "High Energy"
     context = "Perfect for workouts or parties"
-    name = "Energy Boost"
-  } else if (valence > 0.6 && energy < 0.4) {
-    mood = "Content"
-    vibe = "Sunny Day"
-    context = "Great for relaxed afternoons"
-    name = "Sunshine Mix"
-  } else if (valence < 0.4 && energy > 0.6) {
-    mood = "Intense"
-    vibe = "Raw Emotion"
-    context = "When you need to feel something deep"
-    name = "Emotional Release"
-  } else if (valence < 0.4 && energy < 0.4) {
+    name = "Energy Surge"
+    genres = ["pop", "dance", "indie pop"]
+  } else if (energy < 0.4 && valence < 0.4) {
     mood = "Melancholic"
     vibe = "Introspective"
     context = "Late night contemplation"
     name = "Midnight Thoughts"
+    genres = ["indie", "alternative", "downtempo"]
+  } else if (valence > 0.6) {
+    mood = "Content"
+    vibe = "Feel Good"
+    context = "Easy listening for relaxed moments"
+    name = "Good Vibes"
+    genres = ["indie pop", "pop", "alternative"]
+  } else {
+    mood = "Reflective"
+    vibe = "Thoughtful Moments"
+    context = "For introspection and emotional depth"
+    name = "Emotional Landscape"
+    genres = ["indie", "alternative", "soul"]
   }
   
   return {
     playlistName: name,
-    description: `A ${mood.toLowerCase()} collection based on your selections`,
+    description: `A ${mood.toLowerCase()} collection perfectly suited for ${context.toLowerCase()}`,
     mood,
     vibe,
-    recommendedGenres: [],
+    recommendedGenres: genres,
     listeningContext: context,
-    emotionalJourney: `From ${tracks[0].name} to new discoveries`,
-    reasoning: "Selected to match the energy and mood of your seed tracks",
+    emotionalJourney: `From ${tracks[0]?.name || 'your first track'} through a carefully curated emotional journey`,
+    reasoning: "These tracks share similar energy, mood, and musical characteristics, creating a cohesive listening experience.",
   }
 }
 
