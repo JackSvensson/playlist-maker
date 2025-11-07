@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Music } from "lucide-react"
-import { parsePlaylistData, type Track } from "@/types/playlist"
+import { parsePlaylistData } from "@/types/playlist"
 import SaveToSpotifyButton from "@/components/SaveToSpotifyButton"
 
 export default async function PlaylistPage({
@@ -18,7 +18,6 @@ export default async function PlaylistPage({
     redirect("/login")
   }
 
-  // Await params in Next.js 15
   const { id } = await params
 
   const playlist = await prisma.playlist.findUnique({
@@ -40,7 +39,7 @@ export default async function PlaylistPage({
   }
 
   const playlistData = parsePlaylistData(playlist)
-  const { seedTracks, generatedTracks, audioFeatures, aiReasoning } = playlistData
+  const { seedTracks, generatedTracks, aiReasoning } = playlistData
 
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
@@ -54,7 +53,6 @@ export default async function PlaylistPage({
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-6xl mx-auto p-8">
-        {/* Header */}
         <Link 
           href="/dashboard"
           className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition"
@@ -63,7 +61,6 @@ export default async function PlaylistPage({
           Back to Dashboard
         </Link>
 
-        {/* Playlist Info */}
         <div className="bg-gradient-to-br from-[#1DB954] to-[#1ed760] rounded-xl p-8 mb-8">
           <div className="flex items-center gap-4 mb-2">
             <Music size={32} />
@@ -71,7 +68,6 @@ export default async function PlaylistPage({
           </div>
           <p className="text-white/90 mb-4">{playlist.description}</p>
           
-          {/* AI Insights */}
           {aiReasoning?.mood && (
             <div className="flex flex-wrap gap-3 mb-4">
               <span className="bg-white/20 px-4 py-2 rounded-full text-sm font-medium">
@@ -98,7 +94,6 @@ export default async function PlaylistPage({
             <span>Created {new Date(playlist.createdAt).toLocaleDateString()}</span>
           </div>
           
-          {/* Save to Spotify Button */}
           <div className="mt-6">
             <SaveToSpotifyButton 
               playlistId={playlist.id} 
@@ -108,9 +103,7 @@ export default async function PlaylistPage({
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - AI Reasoning */}
           <div className="lg:col-span-1">
-            {/* AI Reasoning */}
             {aiReasoning?.reasoning && (
               <div className="bg-gray-900 rounded-xl p-6">
                 <h3 className="font-bold mb-3 text-[#1DB954]">Why These Tracks?</h3>
@@ -133,9 +126,7 @@ export default async function PlaylistPage({
             )}
           </div>
 
-          {/* Right Column - Tracks */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Seed Tracks */}
             <div className="bg-gray-900 rounded-xl p-6">
               <h2 className="text-2xl font-bold mb-4">Seed Tracks</h2>
               <div className="space-y-3">
@@ -161,7 +152,6 @@ export default async function PlaylistPage({
               </div>
             </div>
 
-            {/* Generated Tracks */}
             <div className="bg-gray-900 rounded-xl p-6">
               <h2 className="text-2xl font-bold mb-4">Recommended Tracks</h2>
               <div className="space-y-2">

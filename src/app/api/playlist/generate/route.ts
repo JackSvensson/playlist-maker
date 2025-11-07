@@ -3,7 +3,6 @@ import { NextResponse } from "next/server"
 import { getSpotifyClient } from "@/lib/spotify"
 import { prisma } from "@/lib/prisma"
 
-// Define types for our track data
 interface TrackData {
   id: string
   name: string
@@ -26,7 +25,7 @@ interface AudioFeature {
   liveness: number
   valence: number
   tempo: number
-  [key: string]: number  // Index signature for dynamic property access
+  [key: string]: number
 }
 
 interface PlaylistFilters {
@@ -145,8 +144,8 @@ export async function POST(request: Request) {
           acousticness: seedAudioFeatures.reduce((sum, f) => sum + f.acousticness, 0) / seedAudioFeatures.length,
         }
       }
-    } catch (error) {
-      console.error("❌ Failed to get seed track details:", error)
+    } catch {
+      console.error("❌ Failed to get seed track details")
     }
 
     let recommendedTracks: TrackData[] = []
@@ -179,13 +178,11 @@ export async function POST(request: Request) {
       
       console.log("✅ Got recommendations successfully!")
       
-    } catch (error: unknown) {
+    } catch {
       console.log("⚠️ Recommendations API failed, using AI-ENHANCED DIVERSITY algorithm...")
       usedFallback = true
       
-      // 🤖 AI-ENHANCED ALGORITHM
       try {
-        // STEP 1: Ask AI for search strategies
         console.log("🤖 Asking AI for diversity strategies...")
         const { getAISearchStrategies } = await import("@/lib/openai")
         aiSearchStrategy = await getAISearchStrategies(seedTracksData, avgFeatures)
@@ -204,7 +201,6 @@ export async function POST(request: Request) {
         const seedTracksDetails = await spotify.getTracks(seedTracks)
         const seedArtistIds = seedTracksDetails.body.tracks.map(t => t.artists[0].id)
         
-        // Helper functions
         const isSimilarTrackName = (name: string): boolean => {
           const normalized = name.toLowerCase()
             .replace(/\s*\(.*?\)\s*/g, '')
@@ -250,7 +246,6 @@ export async function POST(request: Request) {
           return true
         }
         
-        // STRATEGY 1: AI-Suggested Artists
         console.log("🔍 Strategy 1: Searching for AI-suggested artists...")
         for (const artistName of aiSearchStrategy.suggestedArtists.slice(0, 5)) {
           try {
@@ -267,8 +262,8 @@ export async function POST(request: Request) {
                 }
               }
             }
-          } catch (err) {
-            console.error(`Failed to get tracks for ${artistName}:`, err)
+          } catch {
+            console.error(`Failed to get tracks for ${artistName}`)
           }
           
           if (uniqueTracks.size >= 10) break
@@ -276,7 +271,6 @@ export async function POST(request: Request) {
         
         console.log(`✅ Got ${uniqueTracks.size} tracks from AI-suggested artists`)
         
-        // STRATEGY 2: AI-Generated Search Queries
         console.log("🔍 Strategy 2: Using AI-generated search queries...")
         for (const searchQuery of aiSearchStrategy.searchQueries) {
           try {
@@ -293,8 +287,8 @@ export async function POST(request: Request) {
                 if (uniqueTracks.size >= 20) break
               }
             }
-          } catch (searchErr) {
-            console.error("AI search query failed:", searchErr)
+          } catch {
+            console.error("AI search query failed")
           }
           
           if (uniqueTracks.size >= 20) break
@@ -302,7 +296,6 @@ export async function POST(request: Request) {
         
         console.log(`✅ Total after AI searches: ${uniqueTracks.size} tracks`)
         
-        // STRATEGY 3: Related Artists (Spotify's suggestions)
         if (uniqueTracks.size < 15) {
           console.log("🔍 Strategy 3: Related artists for more variety...")
           for (const artistId of seedArtistIds.slice(0, 3)) {
@@ -320,21 +313,20 @@ export async function POST(request: Request) {
                       if (addedFromThisArtist >= 1) break
                     }
                   }
-                } catch (err) {
-                  // Continue if failed
+                } catch {
+                  // Continue
                 }
                 
                 if (uniqueTracks.size >= 20) break
               }
-            } catch (err) {
-              console.error("Failed to get related artists:", err)
+            } catch {
+              console.error("Failed to get related artists")
             }
             
             if (uniqueTracks.size >= 20) break
           }
         }
         
-        // STRATEGY 4: Fallback with seed artists (if needed)
         if (uniqueTracks.size < 15) {
           console.log("⚠️ Adding carefully selected tracks from seed artists...")
           for (const artistId of seedArtistIds) {
@@ -348,8 +340,8 @@ export async function POST(request: Request) {
                   if (added >= 1) break
                 }
               }
-            } catch (err) {
-              console.error("Failed to get artist top tracks:", err)
+            } catch {
+              console.error("Failed to get artist top tracks")
             }
             
             if (uniqueTracks.size >= 20) break
@@ -358,7 +350,6 @@ export async function POST(request: Request) {
         
         recommendedTracks = Array.from(uniqueTracks.values())
         
-        // Final shuffle
         recommendedTracks = recommendedTracks
           .sort(() => Math.random() - 0.5)
           .slice(0, filters?.limit || 20)
@@ -367,8 +358,8 @@ export async function POST(request: Request) {
         console.log(`📊 Unique artists: ${new Set(recommendedTracks.map(t => t.artists.split(',')[0].trim())).size}`)
         console.log(`🤖 AI Strategy used: ${aiSearchStrategy.diversityStrategy}`)
         
-      } catch (fallbackError) {
-        console.error("❌ AI-enhanced algorithm failed:", fallbackError)
+      } catch {
+        console.error("❌ AI-enhanced algorithm failed")
         return NextResponse.json(
           { 
             error: "Failed to generate recommendations. Please try again.",
@@ -384,7 +375,6 @@ export async function POST(request: Request) {
       recommendedTracks = [...recommendedTracks, ...seedTracksData]
     }
 
-    // Find or create user
     let user = await prisma.user.findUnique({
       where: { email: session.user.email }
     })
@@ -411,8 +401,8 @@ export async function POST(request: Request) {
       aiAnalysis = await analyzePlaylistWithAI(seedTracksData, avgFeatures)
       playlistName = aiAnalysis.playlistName
       playlistDescription = aiAnalysis.description
-    } catch (error) {
-      console.error("AI analysis failed, using defaults:", error)
+    } catch {
+      console.error("AI analysis failed, using defaults")
     }
 
     const audioFeaturesData = {
@@ -433,8 +423,6 @@ export async function POST(request: Request) {
       aiSearchStrategy: aiSearchStrategy || undefined
     }
 
-    // Create playlist with proper JSON serialization
-    // Using JSON.parse(JSON.stringify()) ensures all data is properly serializable
     const playlist = await prisma.playlist.create({
       data: {
         name: playlistName,

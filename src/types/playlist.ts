@@ -56,36 +56,47 @@ export interface Track {
     updatedAt: Date
   }
   
-  // Helper function to safely parse Prisma JSON fields
-  export function parsePlaylistData(playlist: any): PlaylistData {
-    // Safely parse seedTracks
+  interface PrismaPlaylist {
+    id: string
+    name: string
+    description: string | null
+    seedTracks: unknown
+    generatedTracks: unknown
+    audioFeatures: unknown
+    aiReasoning: unknown
+    createdAt: Date
+    updatedAt: Date
+    [key: string]: unknown
+  }
+  
+  function parseTrack(track: unknown): Track {
+    const t = track as Record<string, unknown>
+    return {
+      id: String(t.id || ''),
+      name: String(t.name || ''),
+      artists: String(t.artists || ''),
+      album: String(t.album || ''),
+      image: t.image ? String(t.image) : null,
+      uri: String(t.uri || ''),
+      duration_ms: Number(t.duration_ms || 0),
+    }
+  }
+  
+  export function parsePlaylistData(playlist: PrismaPlaylist): PlaylistData {
     const seedTracks = Array.isArray(playlist.seedTracks) 
-      ? (playlist.seedTracks as any[]).map(track => ({
-          id: track.id || '',
-          name: track.name || '',
-          artists: track.artists || '',
-          album: track.album || '',
-          image: track.image || null,
-          uri: track.uri || '',
-          duration_ms: track.duration_ms || 0,
-        }))
+      ? playlist.seedTracks.map(parseTrack)
       : []
   
-    // Safely parse generatedTracks
     const generatedTracks = Array.isArray(playlist.generatedTracks)
-      ? (playlist.generatedTracks as any[]).map(track => ({
-          id: track.id || '',
-          name: track.name || '',
-          artists: track.artists || '',
-          album: track.album || '',
-          image: track.image || null,
-          uri: track.uri || '',
-          duration_ms: track.duration_ms || 0,
-        }))
+      ? playlist.generatedTracks.map(parseTrack)
       : []
   
     return {
-      ...playlist,
+      id: playlist.id,
+      name: playlist.name,
+      description: playlist.description,
+      createdAt: playlist.createdAt,
+      updatedAt: playlist.updatedAt,
       seedTracks,
       generatedTracks,
       audioFeatures: playlist.audioFeatures 

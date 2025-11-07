@@ -28,11 +28,6 @@ interface AISearchStrategy {
   diversityStrategy: string
 }
 
-interface AITrackFilteringResult {
-  selectedTracks: Track[]
-  reasoning: string
-}
-
 interface AIAnalysis {
   playlistName: string
   description: string
@@ -44,7 +39,6 @@ interface AIAnalysis {
   reasoning: string
 }
 
-// AI-POWERED DIVERSITY HELPER
 export async function getAISearchStrategies(
   seedTracks: Track[],
   audioFeatures: AudioFeatures
@@ -120,7 +114,6 @@ IMPORTANT:
   } catch (error) {
     console.error("AI search strategies error:", error)
     
-    // Fallback to basic strategies
     return {
       primaryGenres: ["indie", "alternative"],
       relatedGenres: ["indie rock", "indie pop"],
@@ -136,83 +129,6 @@ IMPORTANT:
   }
 }
 
-// AI-POWERED TRACK FILTERING
-export async function getAITrackFiltering(
-  seedTracks: Track[],
-  candidateTracks: Track[],
-  audioFeatures: AudioFeatures
-): Promise<AITrackFilteringResult> {
-  try {
-    // Only send up to 30 candidates to AI to keep costs down
-    const tracksToAnalyze = candidateTracks.slice(0, 30)
-    
-    const prompt = `You are a music curator. I have seed tracks and candidate tracks. Help me select the MOST DIVERSE yet similar candidates.
-
-SEED TRACKS (what user likes):
-${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
-
-CANDIDATE TRACKS (to choose from):
-${tracksToAnalyze.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
-
-GOAL: Select 15 tracks that:
-1. Are similar in vibe to seed tracks
-2. Are from DIFFERENT artists (maximum diversity)
-3. Represent different sub-styles within the genre
-4. Would create an interesting listening journey
-
-Respond with JSON:
-{
-  "selectedIndices": [1, 5, 8, ...], 
-  "reasoning": "brief explanation of selection strategy"
-}
-
-Return 15 indices (1-based) of the best diverse tracks.`
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert music curator who excels at creating diverse, cohesive playlists. You prioritize variety while maintaining musical coherence."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 300,
-      response_format: { type: "json_object" }
-    })
-
-    const content = response.choices[0].message.content
-    if (!content) {
-      throw new Error("No response from OpenAI")
-    }
-
-    const result = JSON.parse(content) as { selectedIndices?: number[], reasoning?: string }
-    
-    // Convert 1-based indices to 0-based and filter valid tracks
-    const selectedTracks = (result.selectedIndices || [])
-      .map((idx: number) => tracksToAnalyze[idx - 1])
-      .filter((track): track is Track => track !== undefined)
-    
-    return {
-      selectedTracks,
-      reasoning: result.reasoning || "AI-selected for diversity",
-    }
-  } catch (error) {
-    console.error("AI track filtering error:", error)
-    
-    // Fallback: just return first 15
-    return {
-      selectedTracks: candidateTracks.slice(0, 15),
-      reasoning: "Default selection",
-    }
-  }
-}
-
-// Original function kept for playlist naming
 export async function analyzePlaylistWithAI(
   seedTracks: Track[],
   audioFeatures: AudioFeatures
@@ -285,7 +201,6 @@ Respond in JSON format with:
   }
 }
 
-// Helper functions
 function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AIAnalysis {
   const energy = features.energy
   const valence = features.valence
