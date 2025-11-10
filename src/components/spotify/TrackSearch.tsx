@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Search, X, Music, Loader2, Sparkles } from "lucide-react"
+import { Search, X, Music, Loader2, Sparkles, ArrowLeft } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import PlaylistFilters from "@/components/PlaylistFilters"
 
@@ -132,6 +133,15 @@ export default function TrackSearch() {
   return (
     <div className="min-h-screen bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12">
+        {/* Back Button */}
+        <Link 
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition"
+        >
+          <ArrowLeft size={20} />
+          Back to Dashboard
+        </Link>
+
         {/* Header */}
         <div className="text-center mb-8 lg:mb-12">
           <div className="flex items-center justify-center gap-2 lg:gap-3 mb-3 lg:mb-4">
