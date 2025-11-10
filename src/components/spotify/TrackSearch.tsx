@@ -326,7 +326,7 @@ export default function TrackSearch() {
                 {query && !loading && results.length === 0 && (
                   <div className="text-center py-8 sm:py-12">
                     <Search className="mx-auto text-gray-600 mb-3 sm:mb-4" size={40} />
-                    <p className="text-gray-400 text-sm sm:text-base">No results found for "{query}"</p>
+                    <p className="text-gray-400 text-sm sm:text-base">No results found for &quot;{query}&quot;</p>
                   </div>
                 )}
 
