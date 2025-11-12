@@ -30,6 +30,12 @@ interface AISearchStrategy {
   musicalCharacteristics: string[]
 }
 
+interface TrackInsight {
+  trackNumber: number
+  insight: string
+  icon: string
+}
+
 interface AIAnalysis {
   playlistName: string
   description: string
@@ -39,6 +45,18 @@ interface AIAnalysis {
   listeningContext: string
   emotionalJourney: string
   reasoning: string
+  energyFlow: {
+    description: string
+    pattern: 'steady' | 'building' | 'wave' | 'declining' | 'varied'
+    peaks: number[]
+    valleys: number[]
+  }
+  emotionalArc: {
+    description: string
+    pattern: 'uplifting' | 'melancholic' | 'journey' | 'stable' | 'varied'
+    progression: string
+  }
+  insights: TrackInsight[]
 }
 
 export async function getAISearchStrategies(
@@ -157,22 +175,30 @@ Be PRECISE and SPECIFIC. Quality over quantity.`
 
 export async function analyzePlaylistWithAI(
   seedTracks: Track[],
-  audioFeatures: AudioFeatures
+  audioFeatures: AudioFeatures,
+  generatedTracks?: Array<{ name: string; artists: string; audioFeatures?: AudioFeatures }>
 ): Promise<AIAnalysis> {
   try {
-    const prompt = `You are an expert music curator. Analyze these tracks to create a cohesive playlist theme.
+    const trackList = generatedTracks && generatedTracks.length > 0
+      ? generatedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`)
+      : seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`)
 
-SEED TRACKS:
+    const prompt = `You are an expert music curator and data analyst. Analyze this complete playlist to create insights about energy flow, emotional progression, and specific moments.
+
+PLAYLIST (${trackList.length} tracks):
+${trackList.join('\n')}
+
+SEED TRACKS (what the user selected):
 ${seedTracks.map((t, i) => `${i + 1}. "${t.name}" by ${t.artists}`).join('\n')}
 
-AUDIO CHARACTERISTICS:
+OVERALL AUDIO CHARACTERISTICS:
 - Energy: ${(audioFeatures.energy * 100).toFixed(0)}% ${audioFeatures.energy > 0.7 ? '(energetic)' : audioFeatures.energy < 0.4 ? '(calm)' : '(moderate)'}
 - Danceability: ${(audioFeatures.danceability * 100).toFixed(0)}%
 - Mood: ${(audioFeatures.valence * 100).toFixed(0)}% ${audioFeatures.valence > 0.6 ? '(positive)' : audioFeatures.valence < 0.4 ? '(melancholic)' : '(balanced)'}
 - Tempo: ${audioFeatures.tempo.toFixed(0)} BPM
 - Acousticness: ${(audioFeatures.acousticness * 100).toFixed(0)}%
 
-Create a SPECIFIC and ACCURATE playlist concept that truly captures these tracks.
+Create a DETAILED and ACCURATE analysis. Be specific about track numbers and transitions.
 
 Respond in JSON:
 {
@@ -183,15 +209,49 @@ Respond in JSON:
   "recommendedGenres": ["specific genre 1", "specific genre 2", "specific genre 3"],
   "listeningContext": "Perfect situation for this SPECIFIC vibe",
   "emotionalJourney": "What emotional experience this playlist creates",
-  "reasoning": "Why these tracks work together and what makes them cohesive (2-3 sentences)"
-}`
+  "reasoning": "Why these tracks work together and what makes them cohesive (2-3 sentences)",
+  "energyFlow": {
+    "description": "Describe how energy changes through the playlist",
+    "pattern": "steady|building|wave|declining|varied",
+    "peaks": [8, 12, 18],
+    "valleys": [3, 15]
+  },
+  "emotionalArc": {
+    "description": "Describe the emotional progression",
+    "pattern": "uplifting|melancholic|journey|stable|varied",
+    "progression": "Detailed description of how mood evolves"
+  },
+  "insights": [
+    {
+      "trackNumber": 3,
+      "insight": "Specific observation about this track or transition",
+      "icon": "🎵|⚡|💫|🎸|🎹|🎤"
+    },
+    {
+      "trackNumber": 8,
+      "insight": "Another specific insight",
+      "icon": "emoji"
+    },
+    {
+      "trackNumber": 15,
+      "insight": "Final insight",
+      "icon": "emoji"
+    }
+  ]
+}
+
+IMPORTANT: 
+- Track numbers in peaks/valleys/insights must be actual positions (1-${trackList.length})
+- Insights should reference SPECIFIC tracks by number
+- Be accurate about key changes, tempo shifts, and emotional progressions
+- Don't make up transitions that don't exist`
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are a world-class music curator who understands subtle musical nuances and creates compelling, accurate playlist narratives. You are precise and specific in your genre identification."
+          content: "You are a world-class music curator who understands subtle musical nuances and creates compelling, accurate playlist narratives. You are precise and specific in your genre identification. You analyze energy flow, emotional arcs, and specific transitions with expert precision."
         },
         {
           role: "user",
@@ -199,7 +259,7 @@ Respond in JSON:
         }
       ],
       temperature: 0.8,
-      max_tokens: 800,
+      max_tokens: 1200,
       response_format: { type: "json_object" }
     })
 
@@ -219,6 +279,18 @@ Respond in JSON:
       listeningContext: analysis.listeningContext || "Anytime listening",
       emotionalJourney: analysis.emotionalJourney || "A journey through sound",
       reasoning: analysis.reasoning || "Selected based on musical similarity",
+      energyFlow: analysis.energyFlow || {
+        description: "Steady energy throughout",
+        pattern: 'steady',
+        peaks: [],
+        valleys: []
+      },
+      emotionalArc: analysis.emotionalArc || {
+        description: "Balanced emotional progression",
+        pattern: 'stable',
+        progression: "Maintains consistent mood"
+      },
+      insights: analysis.insights || []
     }
   } catch (error) {
     console.error("OpenAI analysis error:", error)
@@ -236,6 +308,8 @@ function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AI
   let context = "Anytime listening"
   let name = "Curated Mix"
   let genres: string[] = []
+  let energyPattern: 'steady' | 'building' | 'wave' | 'declining' | 'varied' = 'steady'
+  let emotionalPattern: 'uplifting' | 'melancholic' | 'journey' | 'stable' | 'varied' = 'stable'
   
   // More nuanced fallback logic
   if (acousticness > 0.6) {
@@ -245,18 +319,24 @@ function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AI
       context = "Perfect for peaceful mornings or sunny afternoons"
       name = "Acoustic Daydreams"
       genres = ["acoustic", "indie folk", "singer-songwriter"]
+      energyPattern = 'wave'
+      emotionalPattern = 'uplifting'
     } else if (valence < 0.4) {
       mood = "Contemplative"
       vibe = "Introspective Acoustic"
       context = "Late night reflection and quiet moments"
       name = "Quiet Contemplation"
       genres = ["acoustic", "indie folk", "melancholic"]
+      energyPattern = 'declining'
+      emotionalPattern = 'melancholic'
     } else {
       mood = "Mellow"
       vibe = "Acoustic Balance"
       context = "Background music for focus or relaxation"
       name = "Acoustic Reflections"
       genres = ["acoustic", "indie", "folk"]
+      energyPattern = 'steady'
+      emotionalPattern = 'stable'
     }
   } else if (energy > 0.7 && valence > 0.6) {
     mood = "Euphoric"
@@ -264,24 +344,32 @@ function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AI
     context = "Perfect for workouts or parties"
     name = "Energy Surge"
     genres = ["pop", "dance", "indie pop"]
+    energyPattern = 'building'
+    emotionalPattern = 'uplifting'
   } else if (energy < 0.4 && valence < 0.4) {
     mood = "Melancholic"
     vibe = "Introspective"
     context = "Late night contemplation"
     name = "Midnight Thoughts"
     genres = ["indie", "alternative", "downtempo"]
+    energyPattern = 'declining'
+    emotionalPattern = 'melancholic'
   } else if (valence > 0.6) {
     mood = "Content"
     vibe = "Feel Good"
     context = "Easy listening for relaxed moments"
     name = "Good Vibes"
     genres = ["indie pop", "pop", "alternative"]
+    energyPattern = 'wave'
+    emotionalPattern = 'journey'
   } else {
     mood = "Reflective"
     vibe = "Thoughtful Moments"
     context = "For introspection and emotional depth"
     name = "Emotional Landscape"
     genres = ["indie", "alternative", "soul"]
+    energyPattern = 'varied'
+    emotionalPattern = 'varied'
   }
   
   return {
@@ -293,6 +381,34 @@ function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AI
     listeningContext: context,
     emotionalJourney: `From ${tracks[0]?.name || 'your first track'} through a carefully curated emotional journey`,
     reasoning: "These tracks share similar energy, mood, and musical characteristics, creating a cohesive listening experience.",
+    energyFlow: {
+      description: `${energyPattern === 'building' ? 'Gradually building energy' : energyPattern === 'wave' ? 'Wave-like energy with peaks and valleys' : energyPattern === 'declining' ? 'Gently declining energy for relaxation' : 'Steady, consistent energy throughout'}`,
+      pattern: energyPattern,
+      peaks: energyPattern === 'wave' ? [8, 15] : energyPattern === 'building' ? [18, 20] : [],
+      valleys: energyPattern === 'wave' ? [3, 12] : []
+    },
+    emotionalArc: {
+      description: `${emotionalPattern === 'uplifting' ? 'Progressively uplifting mood' : emotionalPattern === 'melancholic' ? 'Contemplative and introspective journey' : emotionalPattern === 'journey' ? 'Emotional journey with varied moods' : 'Stable, consistent emotional tone'}`,
+      pattern: emotionalPattern,
+      progression: `Maintains a ${mood.toLowerCase()} atmosphere throughout`
+    },
+    insights: [
+      {
+        trackNumber: 3,
+        insight: "Sets the foundational mood for the playlist",
+        icon: "🎵"
+      },
+      {
+        trackNumber: Math.floor(tracks.length / 2),
+        insight: "Midpoint brings perfect balance to the flow",
+        icon: "⚡"
+      },
+      {
+        trackNumber: tracks.length - 2,
+        insight: "Creates satisfying emotional resolution",
+        icon: "💫"
+      }
+    ]
   }
 }
 
