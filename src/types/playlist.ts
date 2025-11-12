@@ -33,6 +33,12 @@ export interface Track {
     seedAudioFeatures: AudioFeatures[]
   }
   
+  export interface TrackInsight {
+    trackNumber: number
+    insight: string
+    icon: string
+  }
+  
   export interface AIAnalysis {
     mood: string
     vibe?: string
@@ -42,6 +48,18 @@ export interface Track {
     emotionalJourney?: string
     usedFallback?: boolean
     algorithm?: string
+    energyFlow?: {
+      description: string
+      pattern: 'steady' | 'building' | 'wave' | 'declining' | 'varied'
+      peaks: number[]
+      valleys: number[]
+    }
+    emotionalArc?: {
+      description: string
+      pattern: 'uplifting' | 'melancholic' | 'journey' | 'stable' | 'varied'
+      progression: string
+    }
+    insights?: TrackInsight[]
   }
   
   export interface PlaylistData {

@@ -1,6 +1,6 @@
 "use client"
 
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Area, AreaChart } from "recharts"
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Area, AreaChart, ReferenceLine } from "recharts"
 
 interface AudioFeaturesData {
   avgFeatures: {
@@ -19,33 +19,134 @@ interface AudioFeaturesData {
   }>
 }
 
+interface TrackInsight {
+  trackNumber: number
+  insight: string
+  icon: string
+}
+
+interface AIReasoning {
+  mood?: string
+  reasoning?: string
+  listeningContext?: string
+  emotionalJourney?: string
+  energyFlow?: {
+    description: string
+    pattern: 'steady' | 'building' | 'wave' | 'declining' | 'varied'
+    peaks: number[]
+    valleys: number[]
+  }
+  emotionalArc?: {
+    description: string
+    pattern: 'uplifting' | 'melancholic' | 'journey' | 'stable' | 'varied'
+    progression: string
+  }
+  insights?: TrackInsight[]
+}
+
 interface PlaylistVisualizationsProps {
   audioFeatures: AudioFeaturesData
   trackCount: number
+  aiReasoning?: AIReasoning
 }
 
-export function PlaylistVisualizations({ audioFeatures, trackCount }: PlaylistVisualizationsProps) {
+export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning }: PlaylistVisualizationsProps) {
+  // Generate energy flow data based on AI analysis or fallback to algorithm
   const energyFlowData = Array.from({ length: trackCount }, (_, i) => {
     const position = i / (trackCount - 1)
+    const trackNumber = i + 1
     const baseEnergy = audioFeatures.avgFeatures.energy * 10
-    const wave = Math.sin(position * Math.PI * 2) * 1.5
-    const randomVariation = (Math.random() - 0.5) * 0.5
+    
+    let energy = baseEnergy
+    
+    if (aiReasoning?.energyFlow) {
+      const { pattern, peaks, valleys } = aiReasoning.energyFlow
+      
+      // Check if this track is a peak
+      const isPeak = peaks.includes(trackNumber)
+      const isValley = valleys.includes(trackNumber)
+      
+      if (isPeak) {
+        energy = Math.min(10, baseEnergy + 2.5)
+      } else if (isValley) {
+        energy = Math.max(0, baseEnergy - 2)
+      } else {
+        // Apply pattern-based variation
+        switch (pattern) {
+          case 'building':
+            energy = baseEnergy + (position * 3)
+            break
+          case 'declining':
+            energy = baseEnergy - (position * 2.5)
+            break
+          case 'wave':
+            energy = baseEnergy + Math.sin(position * Math.PI * 2) * 2
+            break
+          case 'varied':
+            energy = baseEnergy + (Math.sin(position * Math.PI * 4) * 1.5) + (Math.random() - 0.5) * 0.8
+            break
+          case 'steady':
+          default:
+            energy = baseEnergy + (Math.random() - 0.5) * 0.5
+        }
+      }
+    } else {
+      // Fallback to wave pattern
+      const wave = Math.sin(position * Math.PI * 2) * 1.5
+      const randomVariation = (Math.random() - 0.5) * 0.5
+      energy = baseEnergy + wave + randomVariation
+    }
+    
     return {
-      track: i + 1,
-      energy: Math.max(0, Math.min(10, baseEnergy + wave + randomVariation))
+      track: trackNumber,
+      energy: Math.max(0, Math.min(10, energy))
     }
   })
 
+  // Generate emotional arc data based on AI analysis
   const emotionalArcData = Array.from({ length: trackCount }, (_, i) => {
     const position = i / (trackCount - 1)
+    const trackNumber = i + 1
     const baseValence = audioFeatures.avgFeatures.valence * 10
-    const arc = Math.sin(position * Math.PI) * 2
-    const randomVariation = (Math.random() - 0.5) * 0.5
+    
+    let valence = baseValence
+    
+    if (aiReasoning?.emotionalArc) {
+      const { pattern } = aiReasoning.emotionalArc
+      
+      switch (pattern) {
+        case 'uplifting':
+          valence = baseValence + (position * 3)
+          break
+        case 'melancholic':
+          valence = baseValence - (position * 2)
+          break
+        case 'journey':
+          valence = baseValence + Math.sin(position * Math.PI) * 3
+          break
+        case 'varied':
+          valence = baseValence + (Math.sin(position * Math.PI * 3) * 2) + (Math.random() - 0.5) * 0.8
+          break
+        case 'stable':
+        default:
+          valence = baseValence + (Math.random() - 0.5) * 0.5
+      }
+    } else {
+      // Fallback to arc pattern
+      const arc = Math.sin(position * Math.PI) * 2
+      const randomVariation = (Math.random() - 0.5) * 0.5
+      valence = baseValence + arc + randomVariation
+    }
+    
     return {
-      track: i + 1,
-      valence: Math.max(0, Math.min(10, baseValence + arc + randomVariation))
+      track: trackNumber,
+      valence: Math.max(0, Math.min(10, valence))
     }
   })
+
+  // Get peak and valley positions for reference lines
+  const peakPositions = aiReasoning?.energyFlow?.peaks || []
+  const valleyPositions = aiReasoning?.energyFlow?.valleys || []
 
   return (
     <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -55,6 +156,9 @@ export function PlaylistVisualizations({ audioFeatures, trackCount }: PlaylistVi
           <div className="w-2 h-2 rounded-full bg-orange-500"></div>
           <h3 className="text-base sm:text-lg font-bold">Energy Flow</h3>
         </div>
+        {aiReasoning?.energyFlow?.description && (
+          <p className="text-xs sm:text-sm text-gray-400 mb-3">{aiReasoning.energyFlow.description}</p>
+        )}
         <ResponsiveContainer width="100%" height={180} className="sm:h-[200px]">
           <LineChart data={energyFlowData}>
             <XAxis 
@@ -71,6 +175,24 @@ export function PlaylistVisualizations({ audioFeatures, trackCount }: PlaylistVi
               axisLine={false}
               tickLine={false}
             />
+            {peakPositions.map(peak => (
+              <ReferenceLine 
+                key={`peak-${peak}`}
+                x={peak} 
+                stroke="#10b981" 
+                strokeDasharray="3 3" 
+                strokeOpacity={0.5}
+              />
+            ))}
+            {valleyPositions.map(valley => (
+              <ReferenceLine 
+                key={`valley-${valley}`}
+                x={valley} 
+                stroke="#ef4444" 
+                strokeDasharray="3 3" 
+                strokeOpacity={0.5}
+              />
+            ))}
             <Line 
               type="monotone" 
               dataKey="energy" 
@@ -88,6 +210,9 @@ export function PlaylistVisualizations({ audioFeatures, trackCount }: PlaylistVi
           <div className="w-2 h-2 rounded-full bg-pink-500"></div>
           <h3 className="text-base sm:text-lg font-bold">Emotional Arc</h3>
         </div>
+        {aiReasoning?.emotionalArc?.description && (
+          <p className="text-xs sm:text-sm text-gray-400 mb-3">{aiReasoning.emotionalArc.description}</p>
+        )}
         <ResponsiveContainer width="100%" height={180} className="sm:h-[200px]">
           <AreaChart data={emotionalArcData}>
             <defs>
@@ -182,32 +307,30 @@ export function GenreDistribution({ genres }: GenreDistributionProps) {
 }
 
 interface AIInsightsProps {
-  aiReasoning: {
-    mood?: string
-    reasoning?: string
-    listeningContext?: string
-    emotionalJourney?: string
-  }
+  aiReasoning: AIReasoning
 }
 
 export function AIInsights({ aiReasoning }: AIInsightsProps) {
-  const insights = [
-    {
-      title: "Perfect Transition",
-      description: "Track 3 → 4: Key compatibility creates seamless flow",
-      icon: "🎵"
-    },
-    {
-      title: "Energy Peak",
-      description: "Tracks 8-12 maintain high energy while varying tempo",
-      icon: "⚡"
-    },
-    {
-      title: "Emotional Journey",
-      description: aiReasoning.emotionalJourney || "Gradual shift creates satisfying narrative arc",
-      icon: "💫"
-    }
-  ]
+  // Use AI-generated insights if available, otherwise use defaults
+  const insights = aiReasoning.insights && aiReasoning.insights.length > 0
+    ? aiReasoning.insights
+    : [
+        {
+          trackNumber: 3,
+          insight: "Sets the foundational mood for the playlist",
+          icon: "🎵"
+        },
+        {
+          trackNumber: 8,
+          insight: "Energy peak maintains listener engagement",
+          icon: "⚡"
+        },
+        {
+          trackNumber: 15,
+          insight: aiReasoning.emotionalJourney || "Creates satisfying emotional resolution",
+          icon: "💫"
+        }
+      ]
 
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-800">
@@ -217,13 +340,13 @@ export function AIInsights({ aiReasoning }: AIInsightsProps) {
       </div>
       
       <div className="space-y-3 sm:space-y-4">
-        {insights.map((insight, index) => (
+        {insights.slice(0, 3).map((insight, index) => (
           <div key={index} className="bg-gray-800/50 rounded-lg sm:rounded-xl p-3 sm:p-4">
             <div className="flex items-start gap-2 sm:gap-3">
               <span className="text-xl sm:text-2xl flex-shrink-0">{insight.icon}</span>
               <div className="min-w-0">
-                <h4 className="font-semibold mb-1 text-sm sm:text-base">{insight.title}</h4>
-                <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">{insight.description}</p>
+                <h4 className="font-semibold mb-1 text-sm sm:text-base">Track {insight.trackNumber}</h4>
+                <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">{insight.insight}</p>
               </div>
             </div>
           </div>

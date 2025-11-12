@@ -74,6 +74,22 @@ interface AIAnalysis {
   reasoning: string
   listeningContext?: string
   emotionalJourney?: string
+  energyFlow?: {
+    description: string
+    pattern: string
+    peaks: number[]
+    valleys: number[]
+  }
+  emotionalArc?: {
+    description: string
+    pattern: string
+    progression: string
+  }
+  insights?: Array<{
+    trackNumber: number
+    insight: string
+    icon: string
+  }>
 }
 
 export async function POST(request: Request) {
@@ -396,13 +412,35 @@ export async function POST(request: Request) {
       : `Generated from ${seedTracks.length} seed tracks`
     let aiAnalysis: AIAnalysis | null = null
     
+    // CRITICAL: Analyze COMPLETE playlist with AI
     try {
+      console.log("🤖 Analyzing complete playlist with AI...")
       const { analyzePlaylistWithAI } = await import("@/lib/openai")
-      aiAnalysis = await analyzePlaylistWithAI(seedTracksData, avgFeatures)
+      
+      // Pass ALL tracks (seed + generated) for complete analysis
+      const tracksForAnalysis = recommendedTracks.map(track => ({
+        name: track.name,
+        artists: track.artists
+      }))
+      
+      console.log(`📊 Analyzing ${tracksForAnalysis.length} tracks...`)
+      
+      aiAnalysis = await analyzePlaylistWithAI(
+        seedTracksData,
+        avgFeatures,
+        tracksForAnalysis  // ← CRITICAL: Pass generated tracks!
+      )
+      
+      console.log("✅ AI Analysis complete:")
+      console.log(`  - Energy Flow: ${aiAnalysis.energyFlow?.pattern || 'N/A'}`)
+      console.log(`  - Emotional Arc: ${aiAnalysis.emotionalArc?.pattern || 'N/A'}`)
+      console.log(`  - Insights: ${aiAnalysis.insights?.length || 0} track insights`)
+      
       playlistName = aiAnalysis.playlistName
       playlistDescription = aiAnalysis.description
-    } catch {
-      console.error("AI analysis failed, using defaults")
+    } catch (error) {
+      console.error("❌ AI analysis failed:", error)
+      console.error("Using fallback defaults")
     }
 
     const audioFeaturesData = {
@@ -412,8 +450,14 @@ export async function POST(request: Request) {
 
     const aiReasoningData = aiAnalysis ? {
       mood: aiAnalysis.mood,
+      vibe: aiAnalysis.vibe,
       recommendedGenres: aiAnalysis.recommendedGenres,
       reasoning: aiAnalysis.reasoning,
+      listeningContext: aiAnalysis.listeningContext,
+      emotionalJourney: aiAnalysis.emotionalJourney,
+      energyFlow: aiAnalysis.energyFlow,
+      emotionalArc: aiAnalysis.emotionalArc,
+      insights: aiAnalysis.insights,
       usedFallback,
       algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
       aiSearchStrategy: aiSearchStrategy || undefined
@@ -434,6 +478,8 @@ export async function POST(request: Request) {
         userId: user.id,
       }
     })
+
+    console.log("✅ Playlist created successfully with ID:", playlist.id)
 
     return NextResponse.json({
       playlistId: playlist.id,
