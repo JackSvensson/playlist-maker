@@ -1,6 +1,6 @@
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -23,10 +23,10 @@ model Playlist {
   spotifyPlaylistId String?     @unique
   name              String
   description       String?
-  seedTracks        Json        // Array of track IDs used as seeds
-  generatedTracks   Json        // Array of generated track objects
-  audioFeatures     Json?       // Analysis data
-  aiReasoning       Json?       // AI's decision process
+  seedTracks        Json
+  generatedTracks   Json
+  audioFeatures     Json?
+  aiReasoning       Json?
   userId            String
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt         DateTime    @default(now())
