@@ -102,6 +102,17 @@ interface CustomTooltipProps {
   type: 'energy' | 'emotion'
 }
 
+// Type for Recharts dot props
+interface DotProps {
+  cx?: number
+  cy?: number
+  payload?: {
+    track: number
+    energy?: number
+    valence?: number
+  }
+}
+
 function CustomTooltip({ active, payload, label, type }: CustomTooltipProps) {
   if (active && payload && payload.length) {
     const value = payload[0].value.toFixed(1)
@@ -335,8 +346,10 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
                 dataKey="energy" 
                 stroke="#f97316" 
                 strokeWidth={3}
-                dot={(props: any) => {
+                dot={(props: DotProps) => {
                   const { cx, cy, payload } = props
+                  if (!cx || !cy || !payload) return <g />
+                  
                   const trackNum = payload.track
                   const isPeak = peakPositions.includes(trackNum)
                   const isValley = valleyPositions.includes(trackNum)
