@@ -330,7 +330,7 @@ export async function POST(request: Request) {
                     }
                   }
                 } catch {
-                  // Continue
+                
                 }
                 
                 if (uniqueTracks.size >= 20) break
@@ -412,12 +412,10 @@ export async function POST(request: Request) {
       : `Generated from ${seedTracks.length} seed tracks`
     let aiAnalysis: AIAnalysis | null = null
     
-    // CRITICAL: Analyze COMPLETE playlist with AI
     try {
       console.log("🤖 Analyzing complete playlist with AI...")
       const { analyzePlaylistWithAI } = await import("@/lib/openai")
       
-      // Pass ALL tracks (seed + generated) for complete analysis
       const tracksForAnalysis = recommendedTracks.map(track => ({
         name: track.name,
         artists: track.artists
@@ -428,7 +426,7 @@ export async function POST(request: Request) {
       aiAnalysis = await analyzePlaylistWithAI(
         seedTracksData,
         avgFeatures,
-        tracksForAnalysis  // ← CRITICAL: Pass generated tracks!
+        tracksForAnalysis
       )
       
       console.log("✅ AI Analysis complete:")

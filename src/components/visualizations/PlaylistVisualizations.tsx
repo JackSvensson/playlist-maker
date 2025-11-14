@@ -91,7 +91,6 @@ interface PlaylistVisualizationsProps {
   aiReasoning?: AIReasoning
 }
 
-// Custom tooltip for charts
 interface CustomTooltipProps {
   active?: boolean
   payload?: Array<{
@@ -102,7 +101,6 @@ interface CustomTooltipProps {
   type: 'energy' | 'emotion'
 }
 
-// Type for Recharts dot props
 interface DotProps {
   cx?: number
   cy?: number
@@ -152,7 +150,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
   const [showEnergyInfo, setShowEnergyInfo] = useState(false)
   const [showEmotionInfo, setShowEmotionInfo] = useState(false)
 
-  // Generate energy flow data based on AI analysis or fallback to algorithm
   const energyFlowData = Array.from({ length: trackCount }, (_, i) => {
     const position = i / (trackCount - 1)
     const trackNumber = i + 1
@@ -201,7 +198,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
     }
   })
 
-  // Generate emotional arc data based on AI analysis
   const emotionalArcData = Array.from({ length: trackCount }, (_, i) => {
     const position = i / (trackCount - 1)
     const trackNumber = i + 1
@@ -244,7 +240,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
   const peakPositions = aiReasoning?.energyFlow?.peaks || []
   const valleyPositions = aiReasoning?.energyFlow?.valleys || []
   
-  // Calculate average tempo for display
   const avgTempo = audioFeatures.avgFeatures.tempo.toFixed(0)
 
   return (
@@ -370,7 +365,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
                       </g>
                     )
                   }
-                  // Return nothing visible but with unique key to avoid React warning
                   return <g key={`track-${trackNum}`} />
                 }}
               />

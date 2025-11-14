@@ -18,7 +18,6 @@ interface SpotifyError {
 export async function getSpotifyClient(accessToken: string) {
   spotifyApi.setAccessToken(accessToken)
   
-  // Test if token works
   try {
     await spotifyApi.getMe()
     console.log("✅ Spotify token is valid!")

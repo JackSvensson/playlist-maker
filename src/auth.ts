@@ -9,7 +9,7 @@ const scopes = [
   "playlist-modify-private",
   "user-top-read",
   "user-read-recently-played",
-].join(" ")  // VIKTIGT: MELLANSLAG, inte komma!
+].join(" ") 
 
 const params = {
   scope: scopes,

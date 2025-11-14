@@ -15,7 +15,6 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Verify the playlist belongs to the user
     const playlist = await prisma.playlist.findUnique({
       where: { id },
       include: { user: true }
@@ -35,7 +34,6 @@ export async function DELETE(
       )
     }
 
-    // Delete the playlist
     await prisma.playlist.delete({
       where: { id }
     })

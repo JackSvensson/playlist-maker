@@ -21,10 +21,8 @@ export async function POST(request: Request) {
 
     const spotify = await getSpotifyClient(session.accessToken)
     
-    // Get audio features for multiple tracks
     const audioFeatures = await spotify.getAudioFeaturesForTracks(trackIds)
     
-    // Get track details
     const tracks = await spotify.getTracks(trackIds)
 
     const combinedData = tracks.body.tracks.map((track, index) => {

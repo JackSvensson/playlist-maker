@@ -23,7 +23,6 @@ export default function HistoryClient({ initialPlaylists }: { initialPlaylists: 
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const formatDate = (dateString: string) => {
-    // Client-side formatting to avoid hydration mismatch
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
@@ -33,8 +32,8 @@ export default function HistoryClient({ initialPlaylists }: { initialPlaylists: 
   }
 
   const handleDelete = async (playlistId: string, e: React.MouseEvent) => {
-    e.preventDefault() // Prevent navigation to playlist page
-    e.stopPropagation() // Prevent event bubbling
+    e.preventDefault()
+    e.stopPropagation()
     
     if (!confirm("Are you sure you want to delete this playlist?")) {
       return
@@ -52,7 +51,6 @@ export default function HistoryClient({ initialPlaylists }: { initialPlaylists: 
         throw new Error(errorData.error || "Failed to delete playlist")
       }
 
-      // Remove from UI
       setPlaylists(playlists.filter(p => p.id !== playlistId))
       
     } catch (error) {

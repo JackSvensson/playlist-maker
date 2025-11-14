@@ -311,7 +311,6 @@ function createIntelligentFallback(tracks: Track[], features: AudioFeatures): AI
   let energyPattern: 'steady' | 'building' | 'wave' | 'declining' | 'varied' = 'steady'
   let emotionalPattern: 'uplifting' | 'melancholic' | 'journey' | 'stable' | 'varied' = 'stable'
   
-  // More nuanced fallback logic
   if (acousticness > 0.6) {
     if (valence > 0.6) {
       mood = "Uplifting"

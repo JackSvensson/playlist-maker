@@ -18,7 +18,6 @@ export default function SaveToSpotifyButton({
 
   const handleSave = async () => {
     if (saved) {
-      // If already saved, just open in Spotify
       if (spotifyPlaylistId) {
         window.open(`https://open.spotify.com/playlist/${spotifyPlaylistId}`, '_blank')
       }
@@ -46,10 +45,8 @@ export default function SaveToSpotifyButton({
       
       setSaved(true)
       
-      // Success notification
       alert(`✅ Playlist saved to Spotify with ${data.trackCount} tracks!`)
       
-      // Open in Spotify
       if (data.spotifyUrl) {
         window.open(data.spotifyUrl, '_blank')
       }

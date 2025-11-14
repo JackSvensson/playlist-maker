@@ -161,7 +161,6 @@ export default function TrackSearch() {
         <PlaylistFilters 
           onFiltersChange={setFilters}
           onApply={() => {
-            // Filters are already set via onFiltersChange
             console.log("Filters applied:", filters)
           }}
         />
