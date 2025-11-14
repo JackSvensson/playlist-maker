@@ -1,6 +1,7 @@
 import { auth, signIn } from "@/auth"
 import { redirect } from "next/navigation"
 import { Music, TrendingUp, Zap } from "lucide-react"
+import Header from "@/components/Header"
 
 export default async function LoginPage() {
   const session = await auth()
@@ -11,19 +12,7 @@ export default async function LoginPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#1DB954] to-[#1ed760] flex items-center justify-center">
-              <Music size={24} className="text-white sm:w-7 sm:h-7" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-              AI Playlist Generator
-            </h1>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero Section */}
       <div className="relative">

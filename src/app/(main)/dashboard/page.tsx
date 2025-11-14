@@ -1,7 +1,8 @@
 import { auth, signOut } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { Music, History, Sparkles, LogOut, User } from "lucide-react"
+import { Music, History, Sparkles } from "lucide-react"
+import Header from "@/components/Header"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -12,40 +13,23 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      <Header 
+        user={session.user} 
+        onLogout={async () => {
+          "use server"
+          await signOut({ redirectTo: "/login" })
+        }}
+      />
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 sm:gap-0 mb-8 sm:mb-12">
-          <div>
-            <div className="flex items-center gap-3 mb-3 sm:mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#1DB954] to-[#1ed760] flex items-center justify-center flex-shrink-0">
-                <User size={20} className="sm:w-6 sm:h-6" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-400">Welcome back,</p>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                  {session.user?.name}
-                </h1>
-              </div>
-            </div>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-400">
-              Create AI-powered playlists based on your music taste
-            </p>
-          </div>
-          
-          <form
-            action={async () => {
-              "use server"
-              await signOut({ redirectTo: "/login" })
-            }}
-          >
-            <button
-              type="submit"
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl transition border border-gray-700 text-sm sm:text-base"
-            >
-              <LogOut size={16} className="sm:w-5 sm:h-5" />
-              <span>Logout</span>
-            </button>
-          </form>
+        {/* Welcome Section */}
+        <div className="mb-8 sm:mb-12">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4">
+            Welcome back, {session.user?.name?.split(' ')[0] || 'there'}!
+          </h1>
+          <p className="text-base sm:text-lg lg:text-xl text-gray-400">
+            Ready to discover your next favorite playlist?
+          </p>
         </div>
 
         {/* Action Cards */}
@@ -59,9 +43,9 @@ export default async function DashboardPage() {
               <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                 <Sparkles size={24} className="text-white sm:w-8 sm:h-8" />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-white">Create Playlist</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-white">Create New Playlist</h2>
               <p className="text-white/90 text-sm sm:text-base lg:text-lg">
-                Generate a new AI-powered playlist from your favorite tracks
+                Generate a personalized playlist based on your favorite tracks
               </p>
             </div>
             
@@ -79,9 +63,9 @@ export default async function DashboardPage() {
               <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform border border-purple-500/30">
                 <History size={24} className="text-purple-400 sm:w-8 sm:h-8" />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2">History</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-2">View History</h2>
               <p className="text-gray-400 text-sm sm:text-base lg:text-lg">
-                View your previously created playlists and insights
+                Browse all your previously generated playlists
               </p>
             </div>
             
