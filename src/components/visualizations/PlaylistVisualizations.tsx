@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Area, AreaChart, ReferenceLine, Tooltip } from "recharts"
-import { Info, X } from "lucide-react"
+import { Info, X, AlertCircle } from "lucide-react"
 
 interface AudioFeaturesData {
   avgFeatures: {
@@ -19,6 +19,7 @@ interface AudioFeaturesData {
     tempo: number
     acousticness: number
   }>
+  isEstimated?: boolean // 🆕 Ny flagga
 }
 
 interface InfoModalProps {
@@ -150,6 +151,9 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
   const [showEnergyInfo, setShowEnergyInfo] = useState(false)
   const [showEmotionInfo, setShowEmotionInfo] = useState(false)
 
+  // 🆕 Visa varning om features är estimated
+  const isEstimated = audioFeatures.isEstimated || false
+
   const energyFlowData = Array.from({ length: trackCount }, (_, i) => {
     const position = i / (trackCount - 1)
     const trackNumber = i + 1
@@ -244,6 +248,22 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
 
   return (
     <>
+      {/* 🆕 Varning om estimated features */}
+      {isEstimated && (
+        <div className="mb-6 bg-gradient-to-r from-amber-900/20 via-amber-800/20 to-amber-900/20 border border-amber-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-amber-400 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-400 mb-1">Uppskattade värden</h3>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Audio features är uppskattade baserat på genre och dina filter-inställningar. 
+                BPM och energinivåer är approximationer och kan skilja sig från de faktiska låtarna.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
         {/* Energy Flow */}
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-800">
@@ -251,6 +271,7 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange-500"></div>
               <h3 className="text-base sm:text-lg font-bold">Energy Flow</h3>
+              {isEstimated && <span className="text-xs text-amber-400">~</span>}
             </div>
             <button
               onClick={() => setShowEnergyInfo(true)}
@@ -269,7 +290,7 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
           <div className="flex items-center gap-4 mb-3 text-xs text-gray-400">
             <div className="flex items-center gap-1">
               <span className="text-orange-500">♫</span>
-              <span>Snitt-tempo: {avgTempo} BPM</span>
+              <span>Tempo: {avgTempo} BPM {isEstimated && <span className="text-amber-400">(uppskattat)</span>}</span>
             </div>
           </div>
           
@@ -378,6 +399,7 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-pink-500"></div>
               <h3 className="text-base sm:text-lg font-bold">Emotional Arc</h3>
+              {isEstimated && <span className="text-xs text-amber-400">~</span>}
             </div>
             <button
               onClick={() => setShowEmotionInfo(true)}
@@ -448,6 +470,14 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
             <strong className="text-white">Energy Flow</strong> visar hur intensiteten och aktiviteten varierar genom spellistan.
           </p>
           
+          {isEstimated && (
+            <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3">
+              <p className="text-xs text-amber-300">
+                <strong>OBS:</strong> Dessa värden är uppskattade baserat på genre och dina filter-inställningar.
+              </p>
+            </div>
+          )}
+          
           <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
             <h4 className="font-semibold text-white text-sm">Skalan (0-10):</h4>
             <ul className="space-y-1.5 text-sm">
@@ -469,29 +499,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
               </li>
             </ul>
           </div>
-
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <h4 className="font-semibold text-white text-sm mb-2">Musikanalys:</h4>
-            <p className="text-sm">
-              Energy mäter intensitet baserat på ljudvolym, tempo, och dynamik. En lugn akustisk låt har låg energy, medan intensiv rock eller EDM har hög energy.
-            </p>
-          </div>
-
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <h4 className="font-semibold text-white text-sm mb-2">Symboler i grafen:</h4>
-            <ul className="space-y-1 text-sm">
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">↑</span> <strong>Gröna pilar:</strong> Energitoppar (höjdpunkter)
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-500">↓</span> <strong>Röda pilar:</strong> Lugna stunder (dalar)
-              </li>
-            </ul>
-          </div>
-
-          <p className="text-xs text-gray-400 italic">
-            <strong>Tips:</strong> Tempo (BPM) och energy är olika saker - en långsam låt kan ha hög energy om den är intensiv!
-          </p>
         </div>
       </InfoModal>
 
@@ -505,6 +512,14 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
           <p className="text-sm">
             <strong className="text-white">Emotional Arc</strong> visar den känslomässiga resan genom spellistan - från melankoli till lycka.
           </p>
+          
+          {isEstimated && (
+            <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3">
+              <p className="text-xs text-amber-300">
+                <strong>OBS:</strong> Dessa värden är uppskattade baserat på genre och dina filter-inställningar.
+              </p>
+            </div>
+          )}
           
           <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
             <h4 className="font-semibold text-white text-sm">Skalan (0-10):</h4>
@@ -527,27 +542,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
               </li>
             </ul>
           </div>
-
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <h4 className="font-semibold text-white text-sm mb-2">Musikanalys:</h4>
-            <p className="text-sm">
-              Valence (känslomässig ton) mäter hur positiv eller negativ en låt känns. Detta baseras på musikaliska element som dur/moll, melodi och ljud.
-            </p>
-          </div>
-
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <h4 className="font-semibold text-white text-sm mb-2">Vanliga mönster:</h4>
-            <ul className="space-y-1 text-sm">
-              <li><strong>Uplifting:</strong> Gradvis mer positiv känsla</li>
-              <li><strong>Melancholic:</strong> Introspektiv, djupare känslor</li>
-              <li><strong>Journey:</strong> Upp och ner, emotionell resa</li>
-              <li><strong>Stable:</strong> Konsekvent känslomässig ton</li>
-            </ul>
-          </div>
-
-          <p className="text-xs text-gray-400 italic">
-            <strong>Obs:</strong> En låt kan vara både lugn (låg energy) och glad (hög valence) samtidigt!
-          </p>
         </div>
       </InfoModal>
     </>

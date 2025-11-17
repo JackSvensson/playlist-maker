@@ -47,10 +47,11 @@ interface RequestBody {
 interface SpotifyTrack {
   id: string
   name: string
-  artists: Array<{ name: string; id: string }>
+  artists: Array<{ name: string; id: string; genres?: string[] }>
   album: {
     name: string
     images: Array<{ url: string }>
+    release_date?: string
   }
   uri: string
   duration_ms: number
@@ -92,6 +93,33 @@ interface AIAnalysis {
   }>
 }
 
+// 🆕 Funktion för att uppskatta BPM baserat på genre
+function estimateBPMFromGenre(genres: string[], targetTempo?: number): number {
+  if (targetTempo) return targetTempo
+  
+  const genreString = genres.join(' ').toLowerCase()
+  
+  // Snabba genrer
+  if (genreString.includes('drum and bass') || genreString.includes('dnb')) return 170
+  if (genreString.includes('hardstyle') || genreString.includes('hardcore')) return 150
+  if (genreString.includes('techno') || genreString.includes('trance')) return 135
+  if (genreString.includes('house') || genreString.includes('edm')) return 128
+  if (genreString.includes('dubstep')) return 140
+  
+  // Medium tempo
+  if (genreString.includes('pop') || genreString.includes('indie pop')) return 120
+  if (genreString.includes('rock') || genreString.includes('alternative')) return 125
+  if (genreString.includes('hip hop') || genreString.includes('rap')) return 95
+  if (genreString.includes('r&b') || genreString.includes('soul')) return 90
+  
+  // Långsamma genrer
+  if (genreString.includes('downtempo') || genreString.includes('chillout')) return 85
+  if (genreString.includes('ambient') || genreString.includes('drone')) return 70
+  if (genreString.includes('ballad')) return 75
+  
+  return 120 // Default
+}
+
 export async function POST(request: Request) {
   const session = await auth()
   
@@ -114,12 +142,12 @@ export async function POST(request: Request) {
     
     let seedTracksData: TrackData[] = []
     let seedAudioFeatures: AudioFeature[] = []
-    let avgFeatures = {
-      danceability: 0.5,
-      energy: 0.5,
-      valence: 0.5,
-      tempo: 120,
-      acousticness: 0.5,
+    let seedAvgFeatures = {
+      danceability: filters?.targetDanceability || 0.5,
+      energy: filters?.targetEnergy || 0.5,
+      valence: filters?.targetValence || 0.5,
+      tempo: filters?.targetTempo || 120,
+      acousticness: filters?.targetAcousticness || 0.5,
     }
 
     try {
@@ -133,33 +161,6 @@ export async function POST(request: Request) {
         uri: track.uri,
         duration_ms: track.duration_ms,
       }))
-      
-      const audioFeaturesResponse = await spotify.getAudioFeaturesForTracks(seedTracks)
-      seedAudioFeatures = audioFeaturesResponse.body.audio_features
-        .filter((f): f is NonNullable<typeof f> => f !== null)
-        .map((f): AudioFeature => ({
-          danceability: f.danceability,
-          energy: f.energy,
-          key: f.key,
-          loudness: f.loudness,
-          mode: f.mode,
-          speechiness: f.speechiness,
-          acousticness: f.acousticness,
-          instrumentalness: f.instrumentalness,
-          liveness: f.liveness,
-          valence: f.valence,
-          tempo: f.tempo,
-        }))
-      
-      if (seedAudioFeatures.length > 0) {
-        avgFeatures = {
-          danceability: seedAudioFeatures.reduce((sum, f) => sum + f.danceability, 0) / seedAudioFeatures.length,
-          energy: seedAudioFeatures.reduce((sum, f) => sum + f.energy, 0) / seedAudioFeatures.length,
-          valence: seedAudioFeatures.reduce((sum, f) => sum + f.valence, 0) / seedAudioFeatures.length,
-          tempo: seedAudioFeatures.reduce((sum, f) => sum + f.tempo, 0) / seedAudioFeatures.length,
-          acousticness: seedAudioFeatures.reduce((sum, f) => sum + f.acousticness, 0) / seedAudioFeatures.length,
-        }
-      }
     } catch {
       console.error("❌ Failed to get seed track details")
     }
@@ -173,11 +174,11 @@ export async function POST(request: Request) {
       const recommendations = await spotify.getRecommendations({
         seed_tracks: seedTracks.slice(0, 5),
         limit: filters?.limit || 20,
-        target_danceability: filters?.targetDanceability || avgFeatures.danceability,
-        target_energy: filters?.targetEnergy || avgFeatures.energy,
-        target_valence: filters?.targetValence || avgFeatures.valence,
-        target_tempo: filters?.targetTempo || avgFeatures.tempo,
-        target_acousticness: filters?.targetAcousticness || avgFeatures.acousticness,
+        target_danceability: filters?.targetDanceability || seedAvgFeatures.danceability,
+        target_energy: filters?.targetEnergy || seedAvgFeatures.energy,
+        target_valence: filters?.targetValence || seedAvgFeatures.valence,
+        target_tempo: filters?.targetTempo || seedAvgFeatures.tempo,
+        target_acousticness: filters?.targetAcousticness || seedAvgFeatures.acousticness,
         ...(filters?.minYear && { min_release_date: `${filters.minYear}-01-01` }),
         ...(filters?.maxYear && { max_release_date: `${filters.maxYear}-12-31` }),
       })
@@ -195,19 +196,23 @@ export async function POST(request: Request) {
       console.log("✅ Got recommendations successfully!")
       
     } catch {
-      console.log("⚠️ Recommendations API failed, using AI-ENHANCED DIVERSITY algorithm...")
+      console.log("⚠️ Recommendations API failed, using IMPROVED FALLBACK algorithm with filters...")
       usedFallback = true
       
       try {
         console.log("🤖 Asking AI for diversity strategies...")
         const { getAISearchStrategies } = await import("@/lib/openai")
-        aiSearchStrategy = await getAISearchStrategies(seedTracksData, avgFeatures)
+        aiSearchStrategy = await getAISearchStrategies(seedTracksData, seedAvgFeatures)
         
         console.log("✨ AI suggests:", {
           genres: aiSearchStrategy.primaryGenres,
           artists: aiSearchStrategy.suggestedArtists,
           strategy: aiSearchStrategy.diversityStrategy
         })
+        
+        // 🆕 Respektera limit från filters!
+        const targetLimit = filters?.limit || 20
+        console.log(`🎯 Target: ${targetLimit} tracks`)
         
         const uniqueTracks = new Map<string, TrackData>()
         const artistTrackCount = new Map<string, number>()
@@ -228,6 +233,15 @@ export async function POST(request: Request) {
         const addTrackWithDiversity = (track: SpotifyTrack): boolean => {
           if (!track || !track.id || uniqueTracks.has(track.id) || seedTracks.includes(track.id)) {
             return false
+          }
+          
+          // 🆕 Filtrera efter år om specificerat
+          if (filters?.minYear || filters?.maxYear) {
+            const releaseYear = track.album.release_date ? parseInt(track.album.release_date.split('-')[0]) : null
+            if (releaseYear) {
+              if (filters.minYear && releaseYear < filters.minYear) return false
+              if (filters.maxYear && releaseYear > filters.maxYear) return false
+            }
           }
           
           const artistName = track.artists[0].name
@@ -263,7 +277,7 @@ export async function POST(request: Request) {
         }
         
         console.log("🔍 Strategy 1: Searching for AI-suggested artists...")
-        for (const artistName of aiSearchStrategy.suggestedArtists.slice(0, 5)) {
+        for (const artistName of aiSearchStrategy.suggestedArtists.slice(0, 8)) {
           try {
             const artistSearch = await spotify.searchArtists(artistName, { limit: 1 })
             if (artistSearch.body.artists?.items[0]) {
@@ -271,7 +285,7 @@ export async function POST(request: Request) {
               const topTracks = await spotify.getArtistTopTracks(artist.id, 'SE')
               
               let added = 0
-              for (const track of topTracks.body.tracks.slice(0, 5)) {
+              for (const track of topTracks.body.tracks) {
                 if (addTrackWithDiversity(track)) {
                   added++
                   if (added >= 2) break
@@ -282,37 +296,42 @@ export async function POST(request: Request) {
             console.error(`Failed to get tracks for ${artistName}`)
           }
           
-          if (uniqueTracks.size >= 10) break
+          // 🆕 Stoppa när vi når target
+          if (uniqueTracks.size >= targetLimit) break
         }
         
         console.log(`✅ Got ${uniqueTracks.size} tracks from AI-suggested artists`)
         
-        console.log("🔍 Strategy 2: Using AI-generated search queries...")
-        for (const searchQuery of aiSearchStrategy.searchQueries) {
-          try {
-            const searchResults = await spotify.searchTracks(searchQuery, { 
-              limit: 20,
-              offset: Math.floor(Math.random() * 10)
-            })
-            
-            if (searchResults.body.tracks) {
-              const tracks = searchResults.body.tracks.items.slice(5, 20)
+        // 🆕 Fortsätt bara om vi behöver fler
+        if (uniqueTracks.size < targetLimit) {
+          console.log("🔍 Strategy 2: Using AI-generated search queries...")
+          for (const searchQuery of aiSearchStrategy.searchQueries) {
+            try {
+              const searchResults = await spotify.searchTracks(searchQuery, { 
+                limit: 20,
+                offset: Math.floor(Math.random() * 10)
+              })
               
-              for (const track of tracks) {
-                addTrackWithDiversity(track)
-                if (uniqueTracks.size >= 20) break
+              if (searchResults.body.tracks) {
+                const tracks = searchResults.body.tracks.items
+                
+                for (const track of tracks) {
+                  addTrackWithDiversity(track)
+                  if (uniqueTracks.size >= targetLimit) break
+                }
               }
+            } catch {
+              console.error("AI search query failed")
             }
-          } catch {
-            console.error("AI search query failed")
+            
+            if (uniqueTracks.size >= targetLimit) break
           }
-          
-          if (uniqueTracks.size >= 20) break
         }
         
         console.log(`✅ Total after AI searches: ${uniqueTracks.size} tracks`)
         
-        if (uniqueTracks.size < 15) {
+        // 🆕 Fortsätt bara om vi behöver fler
+        if (uniqueTracks.size < targetLimit) {
           console.log("🔍 Strategy 3: Related artists for more variety...")
           for (const artistId of seedArtistIds.slice(0, 3)) {
             try {
@@ -322,60 +341,36 @@ export async function POST(request: Request) {
                 try {
                   const topTracks = await spotify.getArtistTopTracks(relatedArtist.id, 'SE')
                   
-                  let addedFromThisArtist = 0
-                  for (const track of topTracks.body.tracks.slice(0, 5)) {
-                    if (addTrackWithDiversity(track)) {
-                      addedFromThisArtist++
-                      if (addedFromThisArtist >= 1) break
-                    }
+                  for (const track of topTracks.body.tracks.slice(0, 3)) {
+                    addTrackWithDiversity(track)
+                    if (uniqueTracks.size >= targetLimit) break
                   }
                 } catch {
-                
+                  // Silent fail
                 }
                 
-                if (uniqueTracks.size >= 20) break
+                if (uniqueTracks.size >= targetLimit) break
               }
             } catch {
               console.error("Failed to get related artists")
             }
             
-            if (uniqueTracks.size >= 20) break
-          }
-        }
-        
-        if (uniqueTracks.size < 15) {
-          console.log("⚠️ Adding carefully selected tracks from seed artists...")
-          for (const artistId of seedArtistIds) {
-            try {
-              const topTracks = await spotify.getArtistTopTracks(artistId, 'SE')
-              
-              let added = 0
-              for (const track of topTracks.body.tracks) {
-                if (addTrackWithDiversity(track)) {
-                  added++
-                  if (added >= 1) break
-                }
-              }
-            } catch {
-              console.error("Failed to get artist top tracks")
-            }
-            
-            if (uniqueTracks.size >= 20) break
+            if (uniqueTracks.size >= targetLimit) break
           }
         }
         
         recommendedTracks = Array.from(uniqueTracks.values())
         
+        // 🆕 Skära ner till exakt limit
         recommendedTracks = recommendedTracks
           .sort(() => Math.random() - 0.5)
-          .slice(0, filters?.limit || 20)
+          .slice(0, targetLimit)
         
-        console.log(`✅ Final AI-enhanced playlist: ${recommendedTracks.length} tracks`)
+        console.log(`✅ Final AI-enhanced playlist: ${recommendedTracks.length} tracks (target was ${targetLimit})`)
         console.log(`📊 Unique artists: ${new Set(recommendedTracks.map(t => t.artists.split(',')[0].trim())).size}`)
-        console.log(`🤖 AI Strategy used: ${aiSearchStrategy.diversityStrategy}`)
         
-      } catch {
-        console.error("❌ AI-enhanced algorithm failed")
+      } catch (error) {
+        console.error("❌ AI-enhanced algorithm failed:", error)
         return NextResponse.json(
           { 
             error: "Failed to generate recommendations. Please try again.",
@@ -388,8 +383,23 @@ export async function POST(request: Request) {
 
     if (recommendedTracks.length < 10 && seedTracksData.length > 0) {
       console.log("⚠️ Padding with seed tracks...")
-      recommendedTracks = [...recommendedTracks, ...seedTracksData]
+      recommendedTracks = [...recommendedTracks, ...seedTracksData].slice(0, filters?.limit || 20)
     }
+
+    // 🆕 Uppskatta features från genre istället för API
+    console.log("🎨 Estimating audio features from genres...")
+    let estimatedFeatures = {
+      danceability: filters?.targetDanceability || seedAvgFeatures.danceability,
+      energy: filters?.targetEnergy || seedAvgFeatures.energy,
+      valence: filters?.targetValence || seedAvgFeatures.valence,
+      tempo: estimateBPMFromGenre(aiSearchStrategy?.primaryGenres || [], filters?.targetTempo),
+      acousticness: filters?.targetAcousticness || seedAvgFeatures.acousticness,
+    }
+    
+    console.log(`✅ Estimated features:`)
+    console.log(`   - BPM: ${estimatedFeatures.tempo} (from ${aiSearchStrategy?.primaryGenres.join(', ') || 'filters'})`)
+    console.log(`   - Energy: ${(estimatedFeatures.energy * 100).toFixed(0)}%`)
+    console.log(`   - Danceability: ${(estimatedFeatures.danceability * 100).toFixed(0)}%`)
 
     let user = await prisma.user.findUnique({
       where: { email: session.user.email }
@@ -425,25 +435,23 @@ export async function POST(request: Request) {
       
       aiAnalysis = await analyzePlaylistWithAI(
         seedTracksData,
-        avgFeatures,
+        estimatedFeatures,
         tracksForAnalysis
       )
       
-      console.log("✅ AI Analysis complete:")
-      console.log(`  - Energy Flow: ${aiAnalysis.energyFlow?.pattern || 'N/A'}`)
-      console.log(`  - Emotional Arc: ${aiAnalysis.emotionalArc?.pattern || 'N/A'}`)
-      console.log(`  - Insights: ${aiAnalysis.insights?.length || 0} track insights`)
+      console.log("✅ AI Analysis complete")
       
       playlistName = aiAnalysis.playlistName
       playlistDescription = aiAnalysis.description
     } catch (error) {
       console.error("❌ AI analysis failed:", error)
-      console.error("Using fallback defaults")
     }
 
+    // 🆕 Spara estimated features istället
     const audioFeaturesData = {
-      avgFeatures,
-      seedAudioFeatures: seedAudioFeatures
+      avgFeatures: estimatedFeatures,
+      seedAudioFeatures: seedAudioFeatures,
+      isEstimated: true // 🆕 Flagga för att visa att det är uppskattat
     }
 
     const aiReasoningData = aiAnalysis ? {
@@ -457,12 +465,14 @@ export async function POST(request: Request) {
       emotionalArc: aiAnalysis.emotionalArc,
       insights: aiAnalysis.insights,
       usedFallback,
-      algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
-      aiSearchStrategy: aiSearchStrategy || undefined
+      algorithm: 'ai-enhanced-diversity-with-filters',
+      aiSearchStrategy: aiSearchStrategy || undefined,
+      filtersApplied: filters // 🆕 Spara vilka filters som användes
     } : { 
       usedFallback,
-      algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
-      aiSearchStrategy: aiSearchStrategy || undefined
+      algorithm: 'ai-enhanced-diversity-with-filters',
+      aiSearchStrategy: aiSearchStrategy || undefined,
+      filtersApplied: filters
     }
 
     const playlist = await prisma.playlist.create({
@@ -478,14 +488,15 @@ export async function POST(request: Request) {
     })
 
     console.log("✅ Playlist created successfully with ID:", playlist.id)
+    console.log(`📊 Final stats: ${recommendedTracks.length} tracks, estimated BPM: ${estimatedFeatures.tempo.toFixed(0)}`)
 
     return NextResponse.json({
       playlistId: playlist.id,
       tracks: recommendedTracks,
       seedTracks: seedTracksData,
-      audioFeatures: avgFeatures,
+      audioFeatures: estimatedFeatures,
       usedFallback,
-      algorithm: usedFallback ? 'ai-enhanced-diversity' : 'spotify-recommendations',
+      algorithm: 'ai-enhanced-diversity-with-filters',
       aiStrategy: aiSearchStrategy
     })
   } catch (error) {
