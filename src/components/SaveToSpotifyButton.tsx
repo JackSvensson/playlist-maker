@@ -64,37 +64,40 @@ export default function SaveToSpotifyButton({
     return (
       <button
         onClick={handleSave}
-        className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full font-bold hover:scale-105 transition"
+        className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white text-black px-3 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-base font-bold hover:scale-105 transition w-full sm:w-auto"
       >
-        <Check size={20} />
-        Saved to Spotify
-        <ExternalLink size={16} />
+        <Check size={14} className="sm:w-5 sm:h-5" />
+        <span className="hidden xs:inline">Saved to Spotify</span>
+        <span className="xs:hidden">Saved</span>
+        <ExternalLink size={12} className="sm:w-4 sm:h-4" />
       </button>
     )
   }
 
   return (
-    <div>
+    <div className="w-full sm:w-auto">
       <button
         onClick={handleSave}
         disabled={saving}
-        className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full font-bold hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition"
+        className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white text-black px-3 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-base font-bold hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition w-full"
       >
         {saving ? (
           <>
-            <Loader2 size={20} className="animate-spin" />
-            Saving to Spotify...
+            <Loader2 size={14} className="animate-spin sm:w-5 sm:h-5" />
+            <span className="hidden xs:inline">Saving...</span>
+            <span className="xs:hidden">Saving</span>
           </>
         ) : (
           <>
-            <Music size={20} />
-            Save to Spotify
+            <Music size={14} className="sm:w-5 sm:h-5" />
+            <span className="hidden xs:inline">Save to Spotify</span>
+            <span className="xs:hidden">Save</span>
           </>
         )}
       </button>
       
       {error && (
-        <p className="text-red-400 text-sm mt-2">{error}</p>
+        <p className="text-red-400 text-[10px] sm:text-sm mt-2">{error}</p>
       )}
     </div>
   )
