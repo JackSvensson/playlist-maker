@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { CheckCircle, X, ExternalLink } from "lucide-react"
+import { CheckCircle, X, ExternalLink, AlertCircle } from "lucide-react"
 
 interface ToastProps {
   message: string
@@ -9,20 +9,31 @@ interface ToastProps {
   onClose: () => void
   spotifyUrl?: string
   trackCount?: number
+  isError?: boolean
 }
 
-export default function Toast({ message, isOpen, onClose, spotifyUrl, trackCount }: ToastProps) {
+export default function Toast({ 
+  message, 
+  isOpen, 
+  onClose, 
+  spotifyUrl, 
+  trackCount,
+  isError = false 
+}: ToastProps) {
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
         onClose()
-      }, 5000) // Auto-close after 5 seconds
+      }, 10000) // Auto-close after 5 seconds
       
       return () => clearTimeout(timer)
     }
   }, [isOpen, onClose])
 
   if (!isOpen) return null
+
+  const accentColor = isError ? "red" : "green"
+  const Icon = isError ? AlertCircle : CheckCircle
 
   return (
     <>
@@ -34,30 +45,41 @@ export default function Toast({ message, isOpen, onClose, spotifyUrl, trackCount
       
       {/* Toast */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-md animate-in zoom-in duration-200">
-        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-[#1DB954]/30 shadow-2xl shadow-[#1DB954]/20">
+        <div className={`bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl ${
+          isError 
+            ? "border border-red-500/30 shadow-red-500/20" 
+            : "border border-[#1DB954]/30 shadow-[#1DB954]/20"
+        }`}>
           {/* Close Button */}
           <button
             onClick={onClose}
             className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-white transition p-1 hover:bg-gray-700 rounded-lg"
+            aria-label="Close notification"
           >
             <X size={18} className="sm:w-5 sm:h-5" />
           </button>
 
           {/* Content */}
           <div className="flex items-start gap-3 sm:gap-4 pr-8">
-            {/* Success Icon */}
-            <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
-              <CheckCircle size={20} className="text-[#1DB954] sm:w-6 sm:h-6" />
+            {/* Icon */}
+            <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${
+              isError 
+                ? "bg-red-500/20" 
+                : "bg-[#1DB954]/20"
+            }`}>
+              <Icon size={20} className={`sm:w-6 sm:h-6 ${
+                isError ? "text-red-400" : "text-[#1DB954]"
+              }`} />
             </div>
 
             {/* Text Content */}
             <div className="flex-1 min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">
-                Success!
+                {isError ? "Error" : "Success!"}
               </h3>
               <p className="text-xs sm:text-sm text-gray-300 mb-3 sm:mb-4">
                 {message}
-                {trackCount && (
+                {!isError && trackCount && (
                   <span className="block mt-1 text-[#1DB954] font-semibold">
                     {trackCount} tracks saved
                   </span>
@@ -66,7 +88,7 @@ export default function Toast({ message, isOpen, onClose, spotifyUrl, trackCount
 
               {/* Action Buttons */}
               <div className="flex flex-col xs:flex-row gap-2">
-                {spotifyUrl && (
+                {!isError && spotifyUrl && (
                   <a
                     href={spotifyUrl}
                     target="_blank"

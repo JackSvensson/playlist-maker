@@ -15,15 +15,17 @@ export default function SaveToSpotifyButton({
 }: SaveToSpotifyButtonProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(!!spotifyPlaylistId)
+  const [savedSpotifyUrl, setSavedSpotifyUrl] = useState<string | null>(
+    spotifyPlaylistId ? `https://open.spotify.com/playlist/${spotifyPlaylistId}` : null
+  )
   const [error, setError] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [toastData, setToastData] = useState<{ url?: string; count?: number }>({})
 
   const handleSave = async () => {
-    if (saved) {
-      if (spotifyPlaylistId) {
-        window.open(`https://open.spotify.com/playlist/${spotifyPlaylistId}`, '_blank')
-      }
+    // If already saved, open Spotify
+    if (saved && savedSpotifyUrl) {
+      window.open(savedSpotifyUrl, '_blank')
       return
     }
 
@@ -46,19 +48,36 @@ export default function SaveToSpotifyButton({
 
       const data = await response.json()
       
-      setSaved(true)
+      console.log("✅ Save successful:", data) // Debug log
       
-      // Show toast instead of alert
+      // Update state
+      setSaved(true)
+      setSavedSpotifyUrl(data.spotifyUrl || null)
+      
+      // Show toast
       setToastData({
         url: data.spotifyUrl,
         count: data.trackCount
       })
       setShowToast(true)
       
+      // Open Spotify immediately (in same user action to avoid popup blocker)
+      if (data.spotifyUrl) {
+        console.log("🎵 Opening Spotify:", data.spotifyUrl) // Debug log
+        window.open(data.spotifyUrl, '_blank')
+      }
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save playlist'
-      console.error('Save to Spotify error:', err)
+      console.error('❌ Save to Spotify error:', err)
       setError(errorMessage)
+      
+      // Show error toast instead of alert
+      setToastData({
+        url: undefined,
+        count: undefined
+      })
+      setShowToast(true)
     } finally {
       setSaving(false)
     }
@@ -66,15 +85,27 @@ export default function SaveToSpotifyButton({
 
   if (saved) {
     return (
-      <button
-        onClick={handleSave}
-        className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white text-black px-3 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-base font-bold hover:scale-105 transition w-full sm:w-auto"
-      >
-        <Check size={14} className="sm:w-5 sm:h-5" />
-        <span className="hidden xs:inline">Saved to Spotify</span>
-        <span className="xs:hidden">Saved</span>
-        <ExternalLink size={12} className="sm:w-4 sm:h-4" />
-      </button>
+      <>
+        <button
+          onClick={handleSave}
+          className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white text-black px-3 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-base font-bold hover:scale-105 transition w-full sm:w-auto"
+        >
+          <Check size={14} className="sm:w-5 sm:h-5" />
+          <span className="hidden xs:inline">Saved to Spotify</span>
+          <span className="xs:hidden">Saved</span>
+          <ExternalLink size={12} className="sm:w-4 sm:h-4" />
+        </button>
+
+        {/* Toast Notification */}
+        <Toast
+          message={error || "Playlist saved to Spotify!"}
+          isOpen={showToast}
+          onClose={() => setShowToast(false)}
+          spotifyUrl={toastData.url}
+          trackCount={toastData.count}
+          isError={!!error}
+        />
+      </>
     )
   }
 
@@ -108,11 +139,12 @@ export default function SaveToSpotifyButton({
 
       {/* Toast Notification */}
       <Toast
-        message="Playlist saved to Spotify!"
+        message={error || "Playlist saved to Spotify!"}
         isOpen={showToast}
         onClose={() => setShowToast(false)}
         spotifyUrl={toastData.url}
         trackCount={toastData.count}
+        isError={!!error}
       />
     </>
   )
