@@ -1,12 +1,14 @@
-import { auth } from "@/auth"
+import { auth, signOut } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, Music, Calendar, Clock } from "lucide-react"
+import { Music, Calendar, Clock } from "lucide-react"
 import { parsePlaylistData } from "@/types/playlist"
 import SaveToSpotifyButton from "@/components/SaveToSpotifyButton"
 import { PlaylistVisualizations, GenreDistribution, AIInsights } from "@/components/visualizations/PlaylistVisualizations"
+import Header from "@/components/Header"
+import BackButton from "@/components/BackButton"
 
 export default async function PlaylistPage({
   params,
@@ -28,12 +30,21 @@ export default async function PlaylistPage({
 
   if (!playlist) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-        <div className="text-center">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4">Playlist Not Found</h1>
-          <Link href="/dashboard" className="text-[#1DB954] hover:underline text-sm sm:text-base">
-            Go to Dashboard
-          </Link>
+      <div className="min-h-screen bg-black text-white">
+        <Header 
+          user={session.user} 
+          onLogout={async () => {
+            "use server"
+            await signOut({ redirectTo: "/login" })
+          }}
+        />
+        <div className="flex items-center justify-center px-4 pt-20">
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4">Playlist Not Found</h1>
+            <Link href="/dashboard" className="text-[#1DB954] hover:underline text-sm sm:text-base">
+              Go to Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -55,15 +66,17 @@ export default async function PlaylistPage({
 
   return (
     <div className="min-h-screen bg-black text-white pb-6">
+      <Header 
+        user={session.user} 
+        onLogout={async () => {
+          "use server"
+          await signOut({ redirectTo: "/login" })
+        }}
+      />
+      
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6 lg:py-8">
         {/* Back Button */}
-        <Link 
-          href="/dashboard"
-          className="inline-flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-white mb-2 sm:mb-4 lg:mb-6 transition text-xs sm:text-sm"
-        >
-          <ArrowLeft size={14} className="sm:w-4 sm:h-4" />
-          <span>Back</span>
-        </Link>
+        <BackButton />
 
         {/* Playlist Header Card - Optimized for Mobile */}
         <div className="bg-gradient-to-br from-purple-900/20 via-gray-900 to-gray-900 rounded-lg sm:rounded-xl lg:rounded-2xl p-3 sm:p-5 lg:p-8 mb-3 sm:mb-6 lg:mb-8 border border-purple-500/20">
