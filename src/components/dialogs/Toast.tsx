@@ -106,7 +106,7 @@ export default function Toast({
               {/* Action Buttons */}
               <div className="flex flex-col xs:flex-row gap-2">
                 {!isError && spotifyUrl && (
-                  
+                  <a
                     href={spotifyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
