@@ -32,16 +32,13 @@ export default function ConfirmDialog({
 
   return (
     <>
-      {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 animate-in fade-in duration-200"
         onClick={onClose}
       />
       
-      {/* Dialog */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-md animate-in zoom-in duration-200">
         <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-700 shadow-2xl">
-          {/* Icon & Title */}
           <div className="flex items-start gap-3 sm:gap-4 mb-4">
             {isDangerous && (
               <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -58,7 +55,6 @@ export default function ConfirmDialog({
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col-reverse xs:flex-row gap-2 sm:gap-3 mt-5 sm:mt-6">
             <button
               onClick={onClose}

@@ -24,7 +24,7 @@ export default function Toast({
     if (isOpen) {
       const timer = setTimeout(() => {
         onClose()
-      }, 10000) // Auto-close after 5 seconds
+      }, 10000)
       
       return () => clearTimeout(timer)
     }
@@ -32,7 +32,6 @@ export default function Toast({
 
   if (!isOpen) return null
 
-  const accentColor = isError ? "red" : "green"
   const Icon = isError ? AlertCircle : CheckCircle
 
   return (

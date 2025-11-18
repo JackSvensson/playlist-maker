@@ -69,7 +69,6 @@ export default function HistoryClient({ initialPlaylists }: { initialPlaylists: 
       
     } catch (error) {
       console.error("Delete error:", error)
-      // You could show an error toast here
       alert(`Failed to delete playlist: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setDeletingId(null)
@@ -148,7 +147,6 @@ export default function HistoryClient({ initialPlaylists }: { initialPlaylists: 
                     </div>
                   </Link>
                   
-                  {/* Delete Button */}
                   <button
                     onClick={(e) => handleDeleteClick(playlist.id, playlist.name, e)}
                     disabled={isDeleting}
@@ -169,7 +167,6 @@ export default function HistoryClient({ initialPlaylists }: { initialPlaylists: 
         )}
       </div>
 
-      {/* Confirm Delete Dialog */}
       <ConfirmDialog
         isOpen={showConfirmDialog}
         onClose={() => {

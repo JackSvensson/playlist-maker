@@ -19,7 +19,7 @@ interface AudioFeaturesData {
     tempo: number
     acousticness: number
   }>
-  isEstimated?: boolean // 🆕 Ny flagga
+  isEstimated?: boolean
 }
 
 interface InfoModalProps {
@@ -151,7 +151,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
   const [showEnergyInfo, setShowEnergyInfo] = useState(false)
   const [showEmotionInfo, setShowEmotionInfo] = useState(false)
 
-  // 🆕 Visa varning om features är estimated
   const isEstimated = audioFeatures.isEstimated || false
 
   const energyFlowData = Array.from({ length: trackCount }, (_, i) => {
@@ -248,7 +247,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
 
   return (
     <>
-      {/* 🆕 Varning om estimated features */}
       {isEstimated && (
         <div className="mb-6 bg-gradient-to-r from-amber-900/20 via-amber-800/20 to-amber-900/20 border border-amber-500/30 rounded-xl p-4">
           <div className="flex items-start gap-3">
@@ -265,7 +263,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
       )}
 
       <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
-        {/* Energy Flow */}
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-800">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
@@ -286,7 +283,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
             <p className="text-xs sm:text-sm text-gray-400 mb-3">{aiReasoning.energyFlow.description}</p>
           )}
           
-          {/* Tempo display */}
           <div className="flex items-center gap-4 mb-3 text-xs text-gray-400">
             <div className="flex items-center gap-1">
               <span className="text-orange-500">♫</span>
@@ -294,7 +290,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
             </div>
           </div>
           
-          {/* Peaks and valleys legend */}
           {(peakPositions.length > 0 || valleyPositions.length > 0) && (
             <div className="flex gap-4 mb-3 text-xs">
               {peakPositions.length > 0 && (
@@ -338,7 +333,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
                 }}
               />
               <Tooltip content={<CustomTooltip type="energy" />} />
-              {/* Reference lines for peaks and valleys */}
               {peakPositions.map(peak => (
                 <ReferenceLine 
                   key={`peak-${peak}`}
@@ -393,7 +387,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
           </ResponsiveContainer>
         </div>
 
-        {/* Emotional Arc */}
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-800">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
@@ -459,7 +452,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
         </div>
       </div>
 
-      {/* Energy Flow Info Modal */}
       <InfoModal
         isOpen={showEnergyInfo}
         onClose={() => setShowEnergyInfo(false)}
@@ -502,7 +494,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
         </div>
       </InfoModal>
 
-      {/* Emotional Arc Info Modal */}
       <InfoModal
         isOpen={showEmotionInfo}
         onClose={() => setShowEmotionInfo(false)}

@@ -23,7 +23,6 @@ export default function SaveToSpotifyButton({
   const [toastData, setToastData] = useState<{ url?: string; count?: number }>({})
 
   const handleSave = async () => {
-    // If already saved, open Spotify
     if (saved && savedSpotifyUrl) {
       window.open(savedSpotifyUrl, '_blank')
       return
@@ -48,22 +47,19 @@ export default function SaveToSpotifyButton({
 
       const data = await response.json()
       
-      console.log("✅ Save successful:", data) // Debug log
+      console.log("✅ Save successful:", data)
       
-      // Update state
       setSaved(true)
       setSavedSpotifyUrl(data.spotifyUrl || null)
       
-      // Show toast
       setToastData({
         url: data.spotifyUrl,
         count: data.trackCount
       })
       setShowToast(true)
       
-      // Open Spotify immediately (in same user action to avoid popup blocker)
       if (data.spotifyUrl) {
-        console.log("🎵 Opening Spotify:", data.spotifyUrl) // Debug log
+        console.log("🎵 Opening Spotify:", data.spotifyUrl) 
         window.open(data.spotifyUrl, '_blank')
       }
       
@@ -72,7 +68,6 @@ export default function SaveToSpotifyButton({
       console.error('❌ Save to Spotify error:', err)
       setError(errorMessage)
       
-      // Show error toast instead of alert
       setToastData({
         url: undefined,
         count: undefined
@@ -96,7 +91,6 @@ export default function SaveToSpotifyButton({
           <ExternalLink size={12} className="sm:w-4 sm:h-4" />
         </button>
 
-        {/* Toast Notification */}
         <Toast
           message={error || "Playlist saved to Spotify!"}
           isOpen={showToast}
@@ -137,7 +131,6 @@ export default function SaveToSpotifyButton({
         )}
       </div>
 
-      {/* Toast Notification */}
       <Toast
         message={error || "Playlist saved to Spotify!"}
         isOpen={showToast}

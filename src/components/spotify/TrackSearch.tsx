@@ -4,8 +4,6 @@ import { useState, useCallback } from "react"
 import { Search, X, Music, Loader2, Sparkles, Sliders, Calendar, Music2 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { auth, signOut } from "@/auth"
-import Header from "@/components/Header"
 
 interface Track {
   id: string

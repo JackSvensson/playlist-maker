@@ -93,31 +93,27 @@ interface AIAnalysis {
   }>
 }
 
-// 🆕 Funktion för att uppskatta BPM baserat på genre
 function estimateBPMFromGenre(genres: string[], targetTempo?: number): number {
   if (targetTempo) return targetTempo
   
   const genreString = genres.join(' ').toLowerCase()
   
-  // Snabba genrer
   if (genreString.includes('drum and bass') || genreString.includes('dnb')) return 170
   if (genreString.includes('hardstyle') || genreString.includes('hardcore')) return 150
   if (genreString.includes('techno') || genreString.includes('trance')) return 135
   if (genreString.includes('house') || genreString.includes('edm')) return 128
   if (genreString.includes('dubstep')) return 140
   
-  // Medium tempo
   if (genreString.includes('pop') || genreString.includes('indie pop')) return 120
   if (genreString.includes('rock') || genreString.includes('alternative')) return 125
   if (genreString.includes('hip hop') || genreString.includes('rap')) return 95
   if (genreString.includes('r&b') || genreString.includes('soul')) return 90
   
-  // Långsamma genrer
   if (genreString.includes('downtempo') || genreString.includes('chillout')) return 85
   if (genreString.includes('ambient') || genreString.includes('drone')) return 70
   if (genreString.includes('ballad')) return 75
   
-  return 120 // Default
+  return 120
 }
 
 export async function POST(request: Request) {
@@ -140,9 +136,9 @@ export async function POST(request: Request) {
 
     const spotify = await getSpotifyClient(session.accessToken)
     
-    let seedTracksData: TrackData[] = []
-    let seedAudioFeatures: AudioFeature[] = []
-    let seedAvgFeatures = {
+    const seedTracksData: TrackData[] = []
+    const seedAudioFeatures: AudioFeature[] = []
+    const seedAvgFeatures = {
       danceability: filters?.targetDanceability || 0.5,
       energy: filters?.targetEnergy || 0.5,
       valence: filters?.targetValence || 0.5,
@@ -152,7 +148,7 @@ export async function POST(request: Request) {
 
     try {
       const seedTracksDetails = await spotify.getTracks(seedTracks)
-      seedTracksData = seedTracksDetails.body.tracks.map((track): TrackData => ({
+      seedTracksData.push(...seedTracksDetails.body.tracks.map((track): TrackData => ({
         id: track.id,
         name: track.name,
         artists: track.artists.map(a => a.name).join(", "),
@@ -160,7 +156,7 @@ export async function POST(request: Request) {
         image: track.album.images[0]?.url,
         uri: track.uri,
         duration_ms: track.duration_ms,
-      }))
+      })))
     } catch {
       console.error("❌ Failed to get seed track details")
     }
@@ -210,7 +206,6 @@ export async function POST(request: Request) {
           strategy: aiSearchStrategy.diversityStrategy
         })
         
-        // 🆕 Respektera limit från filters!
         const targetLimit = filters?.limit || 20
         console.log(`🎯 Target: ${targetLimit} tracks`)
         
@@ -235,7 +230,6 @@ export async function POST(request: Request) {
             return false
           }
           
-          // 🆕 Filtrera efter år om specificerat
           if (filters?.minYear || filters?.maxYear) {
             const releaseYear = track.album.release_date ? parseInt(track.album.release_date.split('-')[0]) : null
             if (releaseYear) {
@@ -296,13 +290,11 @@ export async function POST(request: Request) {
             console.error(`Failed to get tracks for ${artistName}`)
           }
           
-          // 🆕 Stoppa när vi når target
           if (uniqueTracks.size >= targetLimit) break
         }
         
         console.log(`✅ Got ${uniqueTracks.size} tracks from AI-suggested artists`)
         
-        // 🆕 Fortsätt bara om vi behöver fler
         if (uniqueTracks.size < targetLimit) {
           console.log("🔍 Strategy 2: Using AI-generated search queries...")
           for (const searchQuery of aiSearchStrategy.searchQueries) {
@@ -330,7 +322,6 @@ export async function POST(request: Request) {
         
         console.log(`✅ Total after AI searches: ${uniqueTracks.size} tracks`)
         
-        // 🆕 Fortsätt bara om vi behöver fler
         if (uniqueTracks.size < targetLimit) {
           console.log("🔍 Strategy 3: Related artists for more variety...")
           for (const artistId of seedArtistIds.slice(0, 3)) {
@@ -346,7 +337,6 @@ export async function POST(request: Request) {
                     if (uniqueTracks.size >= targetLimit) break
                   }
                 } catch {
-                  // Silent fail
                 }
                 
                 if (uniqueTracks.size >= targetLimit) break
@@ -361,7 +351,6 @@ export async function POST(request: Request) {
         
         recommendedTracks = Array.from(uniqueTracks.values())
         
-        // 🆕 Skära ner till exakt limit
         recommendedTracks = recommendedTracks
           .sort(() => Math.random() - 0.5)
           .slice(0, targetLimit)
@@ -386,9 +375,8 @@ export async function POST(request: Request) {
       recommendedTracks = [...recommendedTracks, ...seedTracksData].slice(0, filters?.limit || 20)
     }
 
-    // 🆕 Uppskatta features från genre istället för API
     console.log("🎨 Estimating audio features from genres...")
-    let estimatedFeatures = {
+    const estimatedFeatures = {
       danceability: filters?.targetDanceability || seedAvgFeatures.danceability,
       energy: filters?.targetEnergy || seedAvgFeatures.energy,
       valence: filters?.targetValence || seedAvgFeatures.valence,
@@ -447,11 +435,10 @@ export async function POST(request: Request) {
       console.error("❌ AI analysis failed:", error)
     }
 
-    // 🆕 Spara estimated features istället
     const audioFeaturesData = {
       avgFeatures: estimatedFeatures,
       seedAudioFeatures: seedAudioFeatures,
-      isEstimated: true // 🆕 Flagga för att visa att det är uppskattat
+      isEstimated: true
     }
 
     const aiReasoningData = aiAnalysis ? {
@@ -467,7 +454,7 @@ export async function POST(request: Request) {
       usedFallback,
       algorithm: 'ai-enhanced-diversity-with-filters',
       aiSearchStrategy: aiSearchStrategy || undefined,
-      filtersApplied: filters // 🆕 Spara vilka filters som användes
+      filtersApplied: filters
     } : { 
       usedFallback,
       algorithm: 'ai-enhanced-diversity-with-filters',
