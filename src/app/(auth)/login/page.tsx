@@ -154,7 +154,7 @@ export default async function LoginPage() {
       {/* Footer CTA */}
       <div className="py-16 sm:py-20 px-4 text-center border-t border-gray-800">
         <h3 className="text-3xl sm:text-4xl font-bold mb-4">Ready to discover new music?</h3>
-        <p className="text-gray-400 mb-8 text-base sm:text-lg">Join thousands creating AI-powered playlists</p>
+        <p className="text-gray-400 mb-8 text-base sm:text-lg">Join and start creating AI-powered playlists</p>
         <form
           action={async () => {
             "use server"
