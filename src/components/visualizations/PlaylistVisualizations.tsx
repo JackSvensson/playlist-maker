@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Area, AreaChart, ReferenceLine, Tooltip } from "recharts"
-import { Info, X, AlertCircle } from "lucide-react"
+import { Info, X } from "lucide-react"
 
 interface AudioFeaturesData {
   avgFeatures: {
@@ -247,21 +247,6 @@ export function PlaylistVisualizations({ audioFeatures, trackCount, aiReasoning 
 
   return (
     <>
-      {isEstimated && (
-        <div className="mb-6 bg-gradient-to-r from-amber-900/20 via-amber-800/20 to-amber-900/20 border border-amber-500/30 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="text-amber-400 flex-shrink-0 mt-0.5" size={20} />
-            <div>
-              <h3 className="text-sm font-semibold text-amber-400 mb-1">Uppskattade värden</h3>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Audio features är uppskattade baserat på genre och dina filter-inställningar. 
-                BPM och energinivåer är approximationer och kan skilja sig från de faktiska låtarna.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-800">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
