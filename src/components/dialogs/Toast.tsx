@@ -46,15 +46,13 @@ export default function Toast({
   const Icon = isError ? AlertCircle : CheckCircle
 
   return (
-    <>
-      {/* Backdrop */}
+    <>ß
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
       
-      {/* Toast */}
       <div 
         className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-md animate-in zoom-in duration-200"
         role="alertdialog"
